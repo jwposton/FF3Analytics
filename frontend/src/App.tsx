@@ -19,8 +19,11 @@ function App() {
     let cancelled = false
 
     async function loadHealth() {
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => controller.abort(), 10_000)
+
       try {
-        const response = await fetch("/health")
+        const response = await fetch("/health", { signal: controller.signal })
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`)
         }
@@ -34,6 +37,8 @@ function App() {
           setHealth(null)
           setLoadState("error")
         }
+      } finally {
+        window.clearTimeout(timeoutId)
       }
     }
 
