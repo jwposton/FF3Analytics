@@ -8,8 +8,13 @@ import {
 import type { OmniRow } from "@/types/NormalizedTransaction"
 
 import {
+  EMPTY_FILTERS,
   PAGE_SIZE,
   applyDefaultTypeScope,
+  applyFilters,
+  distinctCategories,
+  distinctSourceAccounts,
+  hasActiveFilters,
   paginateRows,
   sortRows,
 } from "./transactionTable"
@@ -52,6 +57,41 @@ describe("transactionTable", () => {
     expect(parseFloat(sorted[0].amount!)).toBeLessThan(
       parseFloat(sorted[1].amount!),
     )
+  })
+
+  it("applyFilters uses OR logic for categories", () => {
+    const rows = [mainCheckingWithdrawal, transportWithdrawal, creditCardWithdrawal]
+    const filtered = applyFilters(rows, {
+      ...EMPTY_FILTERS,
+      categories: ["Food", "Transport"],
+    })
+    expect(filtered).toEqual([mainCheckingWithdrawal, transportWithdrawal])
+  })
+
+  it("applyFilters search matches source account name", () => {
+    const rows = [mainCheckingWithdrawal, transportWithdrawal]
+    const filtered = applyFilters(rows, {
+      ...EMPTY_FILTERS,
+      search: "grocery",
+    })
+    expect(filtered).toEqual([mainCheckingWithdrawal])
+  })
+
+  it("hasActiveFilters is false for empty filters", () => {
+    expect(hasActiveFilters(EMPTY_FILTERS)).toBe(false)
+    expect(
+      hasActiveFilters({ ...EMPTY_FILTERS, categories: ["Food"] }),
+    ).toBe(true)
+  })
+
+  it("distinctCategories returns sorted unique values", () => {
+    const rows = [mainCheckingWithdrawal, transportWithdrawal, creditCardWithdrawal]
+    expect(distinctCategories(rows)).toEqual(["Food", "Shopping", "Transport"])
+  })
+
+  it("distinctSourceAccounts returns sorted unique values", () => {
+    const rows = [mainCheckingWithdrawal, creditCardWithdrawal]
+    expect(distinctSourceAccounts(rows)).toEqual(["Chase VISA", "Main Checking"])
   })
 
   it("paginateRows returns slice and totalPages", () => {
