@@ -58,6 +58,36 @@ export const uncategorizedWithdrawal: OmniRow = {
   date: "2024-01-18",
 }
 
+/** CC payment transfer — included in trends cash outflow (D-17). */
+export const creditCardPaymentTransfer: OmniRow = {
+  amount: "200.00",
+  type: "transfer",
+  source_account: "Main Checking",
+  source_type: "Asset account",
+  source_role: "Default account",
+  destination_account: "Chase VISA",
+  destination_type: "Asset account",
+  destination_role: "Credit card",
+  budget: "Credit Card Payment",
+  category: "Chase VISA Payment",
+  date: "2024-01-20",
+}
+
+/** Non-CC internal transfer — excluded from trends cash outflow. */
+export const savingsTransfer: OmniRow = {
+  amount: "50.00",
+  type: "transfer",
+  source_account: "Main Checking",
+  source_type: "Asset account",
+  source_role: "Default account",
+  destination_account: "Savings",
+  destination_type: "Asset account",
+  destination_role: "Savings",
+  budget: null,
+  category: "Transfer to Savings",
+  date: "2024-01-21",
+}
+
 /** Rows mirroring backend pytest total (75.50 ±0.01). */
 export const spendingRowsForTotal: OmniRow[] = [
   mainCheckingWithdrawal,

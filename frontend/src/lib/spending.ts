@@ -8,6 +8,21 @@ export function isSpendingWithdrawal(row: OmniRow): boolean {
   )
 }
 
+/** Expanded cash-outflow slice for trends (D-17): bank withdrawals + CC payment transfers. */
+export function isTrendCashOutflow(row: OmniRow): boolean {
+  if (
+    row.type === "withdrawal" &&
+    row.source_type === "Asset account" &&
+    row.source_role !== "Credit card"
+  ) {
+    return true
+  }
+  if (row.type === "transfer" && row.destination_role === "Credit card") {
+    return true
+  }
+  return false
+}
+
 export function spendingWithdrawalTotal(rows: OmniRow[]): number {
   return rows.reduce((sum, row) => {
     if (!isSpendingWithdrawal(row)) return sum

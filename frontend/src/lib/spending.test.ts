@@ -1,14 +1,37 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  creditCardPaymentTransfer,
+  creditCardWithdrawal,
+  mainCheckingWithdrawal,
+  savingsTransfer,
   spendingRowsForTopCategory,
   spendingRowsForTotal,
 } from "@/test/fixtures/omniRows"
 import {
   isSpendingWithdrawal,
+  isTrendCashOutflow,
   spendingWithdrawalTotal,
   topCategoryBySpend,
 } from "@/lib/spending"
+
+describe("isTrendCashOutflow", () => {
+  it("trend: includes bank asset withdrawals", () => {
+    expect(isTrendCashOutflow(mainCheckingWithdrawal)).toBe(true)
+  })
+
+  it("trend: includes credit card payment transfers", () => {
+    expect(isTrendCashOutflow(creditCardPaymentTransfer)).toBe(true)
+  })
+
+  it("trend: excludes credit card purchase withdrawals", () => {
+    expect(isTrendCashOutflow(creditCardWithdrawal)).toBe(false)
+  })
+
+  it("trend: excludes non-CC internal transfers", () => {
+    expect(isTrendCashOutflow(savingsTransfer)).toBe(false)
+  })
+})
 
 describe("spendingWithdrawalTotal", () => {
   it("total: sums asset non-credit-card withdrawals within tolerance", () => {
