@@ -1,4 +1,7 @@
+import { ExternalLink } from "lucide-react"
+
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -8,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { buildFireflyTransactionUrl } from "@/lib/fireflyLinks"
 import { formatCurrency, isSpendingWithdrawal } from "@/lib/spending"
 import type { SortDir, SortKey } from "@/lib/transactionTable"
 import type { OmniRow } from "@/types/NormalizedTransaction"
@@ -29,6 +33,7 @@ type TransactionTableProps = {
   onSort: (key: SortKey) => void
   isLoading: boolean
   showAllTypes: boolean
+  fireflyBaseUrl?: string
 }
 
 function ariaSortValue(
@@ -62,7 +67,10 @@ export function TransactionTable({
   onSort,
   isLoading,
   showAllTypes,
+  fireflyBaseUrl,
 }: TransactionTableProps) {
+  const showLinkColumn = Boolean(fireflyBaseUrl)
+
   if (isLoading) {
     return (
       <div className="rounded-lg border">
@@ -72,6 +80,11 @@ export function TransactionTable({
               {COLUMNS.map((col) => (
                 <TableHead key={col.key}>{col.label}</TableHead>
               ))}
+              {showLinkColumn ? (
+                <TableHead className="w-10">
+                  <span className="sr-only">Open in Firefly</span>
+                </TableHead>
+              ) : null}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -82,6 +95,11 @@ export function TransactionTable({
                     <Skeleton className="h-5 w-full max-w-[8rem]" />
                   </TableCell>
                 ))}
+                {showLinkColumn ? (
+                  <TableCell>
+                    <Skeleton className="h-5 w-8" />
+                  </TableCell>
+                ) : null}
               </TableRow>
             ))}
           </TableBody>
@@ -111,11 +129,20 @@ export function TransactionTable({
                 </button>
               </TableHead>
             ))}
+            {showLinkColumn ? (
+              <TableHead className="w-10">
+                <span className="sr-only">Open in Firefly</span>
+              </TableHead>
+            ) : null}
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((row, index) => {
             const amount = formatAmount(row)
+            const fireflyUrl = buildFireflyTransactionUrl(
+              fireflyBaseUrl,
+              row.journal_id,
+            )
             return (
               <TableRow key={`${row.date}-${row.amount}-${index}`}>
                 <TableCell>{row.date}</TableCell>
@@ -131,6 +158,28 @@ export function TransactionTable({
                 <TableCell>{cellValue(row, "budget")}</TableCell>
                 <TableCell>{cellValue(row, "source_account")}</TableCell>
                 <TableCell>{cellValue(row, "destination_account")}</TableCell>
+                {showLinkColumn ? (
+                  <TableCell className="text-right">
+                    {fireflyUrl ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        asChild
+                      >
+                        <a
+                          href={fireflyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label="Open transaction in Firefly"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    ) : null}
+                  </TableCell>
+                ) : null}
               </TableRow>
             )
           })}
