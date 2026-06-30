@@ -13,6 +13,7 @@ export function SpendingSankeyPage() {
       buildMain={(rows) =>
         buildSpendingSankeyData(rows, "source-budget-category")
       }
+      enableDrilldown
     />
   )
 }

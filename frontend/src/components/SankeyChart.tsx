@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react"
+import type { ReactNode } from "react"
 import ReactECharts from "echarts-for-react"
 import type { EChartsOption } from "echarts"
 
@@ -14,6 +15,7 @@ type SankeyChartProps = {
   height?: number
   chartTitle?: string
   interactionHint?: string
+  headerActions?: ReactNode
   onNodeClick?: (nodeName: string) => void
   onEdgeClick?: (source: string, target: string) => void
 }
@@ -25,6 +27,7 @@ export function SankeyChart({
   height = 540,
   chartTitle,
   interactionHint,
+  headerActions,
   onNodeClick,
   onEdgeClick,
 }: SankeyChartProps) {
@@ -153,14 +156,23 @@ export function SankeyChart({
 
   return (
     <Card>
-      {(chartTitle || interactionHint) && (
-        <CardHeader>
-          {chartTitle && (
-            <CardTitle className="text-base">{chartTitle}</CardTitle>
-          )}
-          {interactionHint && (
-            <p className="text-sm text-muted-foreground">{interactionHint}</p>
-          )}
+      {(chartTitle || interactionHint || headerActions) && (
+        <CardHeader
+          className={
+            headerActions
+              ? "flex flex-row items-center justify-between gap-2 space-y-0"
+              : undefined
+          }
+        >
+          <div className="space-y-1">
+            {chartTitle && (
+              <CardTitle className="text-base">{chartTitle}</CardTitle>
+            )}
+            {interactionHint && (
+              <p className="text-sm text-muted-foreground">{interactionHint}</p>
+            )}
+          </div>
+          {headerActions}
         </CardHeader>
       )}
       <CardContent>

@@ -1,12 +1,16 @@
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
 
 import { SankeyChart } from "@/components/SankeyChart"
 import { Button } from "@/components/ui/button"
 import { useDateRange } from "@/context/DateRangeContext"
 import { useNormalizedTransactions } from "@/hooks/useNormalizedTransactions"
-import type { SankeyData } from "@/lib/sankey"
-import { sankeyChartHeight } from "@/lib/sankey"
+import type { FlowType, SankeyData, SelectedSankeyNode } from "@/lib/sankey"
+import {
+  buildSpendingSankeyData,
+  filterRowsForDrilldown,
+  sankeyChartHeight,
+} from "@/lib/sankey"
 import type { OmniRow } from "@/types/NormalizedTransaction"
 
 export type SankeyReportPageProps = {
@@ -18,6 +22,60 @@ export type SankeyReportPageProps = {
   buildMain: (rows: OmniRow[]) => SankeyData
   controls?: ReactNode
   enableDrilldown?: boolean
+  drilldownResetKey?: number | string
+}
+
+function parseNodeSelection(
+  nodeName: string,
+  nodeDisplay: Record<string, string>,
+): SelectedSankeyNode | null {
+  const typeMatch = nodeName.match(/\((B|C|P|A|T)\)$/)
+  if (!typeMatch) return null
+
+  let type: SelectedSankeyNode["type"]
+  switch (typeMatch[1]) {
+    case "B":
+      type = "Budget"
+      break
+    case "C":
+      type = "Category"
+      break
+    case "P":
+      type = "Payee"
+      break
+    case "A":
+      type = "Account"
+      break
+    case "T":
+      type = "AccountType"
+      break
+    default:
+      return null
+  }
+
+  let displayName = nodeDisplay[nodeName] ?? nodeName
+  if (type === "AccountType") {
+    if (nodeName === "Bank Account (T)") displayName = "Bank Accounts"
+    else if (nodeName === "Credit Card (T)") displayName = "Credit Cards"
+  }
+
+  return { name: nodeName, type, displayName }
+}
+
+function drilldownFlowType(
+  selected: SelectedSankeyNode,
+): FlowType {
+  switch (selected.type) {
+    case "Budget":
+      return "source-budget-category-payee"
+    case "Category":
+      return "source-category-payee"
+    case "Account":
+    case "AccountType":
+      return "source-budget-category"
+    default:
+      return "source-budget-category"
+  }
 }
 
 export function SankeyReportPage({
@@ -28,12 +86,27 @@ export function SankeyReportPage({
   emptyMessage,
   buildMain,
   controls,
-  enableDrilldown: _enableDrilldown = false,
+  enableDrilldown = false,
+  drilldownResetKey,
 }: SankeyReportPageProps) {
   const { committedRange } = useDateRange()
   const { start: committedStart, end: committedEnd } = committedRange
   const { isPending, isError, isSuccess, data, refetch } =
     useNormalizedTransactions(committedStart, committedEnd)
+
+  const [selectedNode, setSelectedNode] = useState<SelectedSankeyNode | null>(
+    null,
+  )
+
+  useEffect(() => {
+    setSelectedNode(null)
+  }, [committedStart, committedEnd])
+
+  useEffect(() => {
+    if (drilldownResetKey !== undefined) {
+      setSelectedNode(null)
+    }
+  }, [drilldownResetKey])
 
   const allRows = isSuccess ? (data?.data ?? []) : []
 
@@ -43,6 +116,28 @@ export function SankeyReportPage({
     () => buildMain(sliceRows),
     [sliceRows, buildMain],
   )
+
+  const mainNodeDisplay = useMemo(() => {
+    const map: Record<string, string> = {}
+    mainData.nodes.forEach((n) => {
+      map[n.name] = n.displayName
+    })
+    return map
+  }, [mainData.nodes])
+
+  const subchartData = useMemo(() => {
+    if (!enableDrilldown || !selectedNode) {
+      return { nodes: [], links: [] }
+    }
+    const filtered = filterRowsForDrilldown(sliceRows, selectedNode)
+    return buildSpendingSankeyData(filtered, drilldownFlowType(selectedNode))
+  }, [enableDrilldown, selectedNode, sliceRows])
+
+  const handleMainNodeClick = (nodeName: string) => {
+    if (!enableDrilldown) return
+    const parsed = parseNodeSelection(nodeName, mainNodeDisplay)
+    if (parsed) setSelectedNode(parsed)
+  }
 
   return (
     <div className="space-y-8">
@@ -75,14 +170,37 @@ export function SankeyReportPage({
           </Button>
         </div>
       ) : (
-        <SankeyChart
-          data={mainData}
-          loading={isPending}
-          emptyMessage={emptyMessage}
-          height={sankeyChartHeight(mainData.nodes.length)}
-          chartTitle={mainChartTitle}
-          interactionHint={interactionHint}
-        />
+        <>
+          <SankeyChart
+            data={mainData}
+            loading={isPending}
+            emptyMessage={emptyMessage}
+            height={sankeyChartHeight(mainData.nodes.length)}
+            chartTitle={mainChartTitle}
+            interactionHint={interactionHint}
+            onNodeClick={enableDrilldown ? handleMainNodeClick : undefined}
+          />
+
+          {enableDrilldown && selectedNode && (
+            <SankeyChart
+              data={subchartData}
+              emptyMessage="No breakdown data for this selection in this date range"
+              height={sankeyChartHeight(subchartData.nodes.length)}
+              chartTitle={`${selectedNode.displayName} breakdown`}
+              headerActions={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedNode(null)}
+                  aria-label="Clear sankey drilldown"
+                >
+                  Clear
+                </Button>
+              }
+            />
+          )}
+        </>
       )}
     </div>
   )

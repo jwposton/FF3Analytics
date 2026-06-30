@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { isSpendingExpense } from "@/lib/spending"
@@ -21,17 +21,35 @@ vi.mock("@/components/SankeyChart", () => ({
     emptyMessage,
     loading,
     data,
+    chartTitle,
+    onNodeClick,
+    headerActions,
   }: {
     emptyMessage: string
-    loading: boolean
+    loading?: boolean
     data: { nodes: unknown[] }
+    chartTitle?: string
+    onNodeClick?: (nodeName: string) => void
+    headerActions?: React.ReactNode
   }) => {
     if (loading) {
       return <div data-testid="chart-loading" />
     }
     const hasData = data.nodes.length > 0
+    if (chartTitle?.includes("breakdown")) {
+      return (
+        <div data-testid="drilldown-chart">
+          {headerActions}
+          <span data-testid="drilldown-title">{chartTitle}</span>
+          {!hasData && <div data-testid="drilldown-empty">{emptyMessage}</div>}
+        </div>
+      )
+    }
     return hasData ? (
-      <div data-testid="sankey-chart" />
+      <div
+        data-testid="sankey-chart"
+        onClick={() => onNodeClick?.("Essentials (B)")}
+      />
     ) : (
       <div data-testid="empty-message">{emptyMessage}</div>
     )
@@ -85,5 +103,30 @@ describe("SpendingSankeyPage", () => {
 
     expect(screen.getByTestId("sankey-chart")).toBeTruthy()
     expect(screen.queryByTestId("empty-message")).toBeNull()
+  })
+
+  it("shows drilldown card when a budget node is clicked", async () => {
+    const rows = [mainCheckingWithdrawal]
+    mockUseNormalizedTransactions.mockReturnValue({
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+      data: { data: rows },
+      refetch: vi.fn(),
+    })
+
+    render(<SpendingSankeyPage />)
+
+    fireEvent.click(screen.getByTestId("sankey-chart"))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("drilldown-chart")).toBeTruthy()
+    })
+    expect(screen.getByTestId("drilldown-title").textContent).toBe(
+      "Essentials breakdown",
+    )
+    expect(
+      screen.getByRole("button", { name: "Clear sankey drilldown" }),
+    ).toBeTruthy()
   })
 })
