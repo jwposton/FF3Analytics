@@ -6,6 +6,7 @@ import { ReportStubPage } from "@/pages/ReportStubPage"
 import { SpendingBarPage } from "@/pages/SpendingBarPage"
 import { SpendingLinePage } from "@/pages/SpendingLinePage"
 import { CashFlowBarPage } from "@/pages/CashFlowBarPage"
+import { CashFlowLinePage } from "@/pages/CashFlowLinePage"
 import { TransactionExplorerPage } from "@/pages/TransactionExplorerPage"
 
 export const router = createBrowserRouter([
@@ -29,6 +30,10 @@ export const router = createBrowserRouter([
       {
         path: "reports/cash-flow",
         element: <CashFlowBarPage />,
+      },
+      {
+        path: "reports/cash-flow/trends",
+        element: <CashFlowLinePage />,
       },
       {
         path: "reports/sankey",

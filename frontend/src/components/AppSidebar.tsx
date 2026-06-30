@@ -57,6 +57,12 @@ const cashFlowNavItems = [
     icon: BarChart3,
     end: true,
   },
+  {
+    to: "/reports/cash-flow/trends",
+    label: "Line/Trend",
+    icon: TrendingUp,
+    end: false,
+  },
 ] as const
 
 function NavItems({
