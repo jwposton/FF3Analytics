@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { cleanup, render, screen } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { TrendLineSeries } from "@/lib/barChart"
 import { TOTAL_LABEL } from "@/lib/barChart"
@@ -39,6 +39,10 @@ const sampleProps = {
 }
 
 describe("BudgetLineChart", () => {
+  afterEach(() => {
+    cleanup()
+  })
+
   beforeEach(() => {
     capturedOption = null
     capturedOnEvents = null
