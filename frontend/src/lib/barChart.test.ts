@@ -6,7 +6,7 @@ import {
   creditCardWithdrawal,
   mainCheckingWithdrawal,
 } from "@/test/fixtures/omniRows"
-import { buildBarChartData } from "@/lib/barChart"
+import { buildBarChartData, barChartDataToLineSeries, TOTAL_LABEL } from "@/lib/barChart"
 import { isSpendingExpense, isTrendCashOutflow } from "@/lib/spending"
 
 function makeRow(overrides: Partial<OmniRow> & Pick<OmniRow, "date">): OmniRow {
@@ -124,5 +124,49 @@ describe("buildBarChartData", () => {
     })
     expect(result.stacks).toEqual(["Uncategorized"])
     expect(result.data["2026-01"]?.["Uncategorized"]).toBeCloseTo(25, 2)
+  })
+})
+
+describe("barChartDataToLineSeries", () => {
+  const chartData = {
+    months: ["2026-01", "2026-02"],
+    stacks: ["Groceries", "Transport"],
+    data: {
+      "2026-01": { Groceries: 100, Transport: 50 },
+      "2026-02": { Groceries: 80, Transport: 20 },
+    },
+  }
+
+  it("maps stacks to one series per budget with correct monthly values", () => {
+    const series = barChartDataToLineSeries(chartData)
+
+    expect(series).toHaveLength(2)
+    expect(series[0]).toEqual({
+      name: "Groceries",
+      data: [100, 80],
+    })
+    expect(series[1]).toEqual({
+      name: "Transport",
+      data: [50, 20],
+    })
+  })
+
+  it("includeTotal true appends dashed Total series summing stacks per month", () => {
+    const series = barChartDataToLineSeries(chartData, { includeTotal: true })
+
+    expect(series).toHaveLength(3)
+    const total = series.find((s) => s.name === TOTAL_LABEL)
+    expect(total).toEqual({
+      name: TOTAL_LABEL,
+      data: [150, 100],
+      dashed: true,
+    })
+  })
+
+  it("includeTotal false returns budget series only", () => {
+    const series = barChartDataToLineSeries(chartData, { includeTotal: false })
+
+    expect(series).toHaveLength(2)
+    expect(series.every((s) => !s.dashed)).toBe(true)
   })
 })
