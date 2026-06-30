@@ -4,6 +4,7 @@ import { AppShell } from "@/layouts/AppShell"
 import { DashboardPage } from "@/pages/DashboardPage"
 import { ReportStubPage } from "@/pages/ReportStubPage"
 import { SpendingBarPage } from "@/pages/SpendingBarPage"
+import { SpendingLinePage } from "@/pages/SpendingLinePage"
 import { SpendingTrendsPage } from "@/pages/SpendingTrendsPage"
 import { TransactionExplorerPage } from "@/pages/TransactionExplorerPage"
 
@@ -20,6 +21,10 @@ export const router = createBrowserRouter([
       {
         path: "reports/spending",
         element: <SpendingBarPage />,
+      },
+      {
+        path: "reports/spending/trends",
+        element: <SpendingLinePage />,
       },
       {
         path: "reports/cash-flow",

@@ -37,6 +37,12 @@ const spendingNavItems = [
     end: true,
   },
   {
+    to: "/reports/spending/trends",
+    label: "Line/Trend",
+    icon: TrendingUp,
+    end: false,
+  },
+  {
     to: "/reports/sankey",
     label: "Sankey Flows",
     icon: GitBranch,
