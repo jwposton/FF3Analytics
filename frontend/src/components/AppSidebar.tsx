@@ -28,7 +28,7 @@ const navItems = [
   },
   {
     to: "/reports/trends",
-    label: "Spending Trends",
+    label: "Cash Flow",
     icon: TrendingUp,
     end: false,
   },

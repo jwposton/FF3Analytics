@@ -53,7 +53,7 @@ export function SpendingTrendsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Spending Trends</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Cash Flow</h1>
 
       <TrendsControls
         viewMode={viewMode}
