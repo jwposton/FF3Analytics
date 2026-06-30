@@ -52,6 +52,21 @@ describe("firefly:", () => {
     expect(result.length).toBeGreaterThan(0)
   })
 
+  it("maps Cash Flow deposit source→bank edge without type:withdrawal", () => {
+    const result = buildFireflyFilters(
+      buildDateRangeFilters("2024-01-01", "2024-01-31"),
+      "Paycheck_SRC",
+      "Main Checking_BANK",
+      {
+        Paycheck_SRC: "Paycheck",
+        "Main Checking_BANK": "Main Checking",
+      },
+    )
+    expect(result).toContain('account_is:"Paycheck"')
+    expect(result).toContain('account_is:"Main Checking"')
+    expect(result).not.toContain("type:withdrawal")
+  })
+
   it("opens Firefly search with encodeURIComponent and noopener,noreferrer", () => {
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null)
     openFireflySearch("https://firefly.example/", 'budget_is:"Food"')
