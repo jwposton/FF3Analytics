@@ -31,26 +31,14 @@ vi.mock("@/components/BudgetLineReportPage", () => ({
 import { CashFlowLinePage } from "./CashFlowLinePage"
 
 describe("CashFlowLinePage", () => {
-  it("uses BudgetLineReportPage with isTrendCashOutflow filter", () => {
+  it("uses isTrendCashOutflow filter and cash outflow copy", () => {
     const { getByTestId } = render(<CashFlowLinePage />)
     const el = getByTestId("budget-line-report")
 
     expect(el.getAttribute("data-filter")).toBe("cash-outflow")
-  })
-
-  it("shows No cash outflow in this date range empty message", () => {
-    const { getByTestId } = render(<CashFlowLinePage />)
-    const el = getByTestId("budget-line-report")
-
     expect(el.getAttribute("data-empty-message")).toBe(
       "No cash outflow in this date range",
     )
-  })
-
-  it("uses Cash Flow page title and cash flow line chart copy", () => {
-    const { getByTestId } = render(<CashFlowLinePage />)
-    const el = getByTestId("budget-line-report")
-
     expect(el.getAttribute("data-page-title")).toBe("Cash Flow")
     expect(el.getAttribute("data-line-chart-title")).toBe(
       "Cash flow trends by month",
