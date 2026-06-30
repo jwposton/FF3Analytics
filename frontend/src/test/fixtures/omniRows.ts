@@ -88,7 +88,52 @@ export const creditCardPaymentTransferNoBudget: OmniRow = {
   date: "2024-01-20",
 }
 
-/** Non-CC internal transfer — excluded from trends cash outflow. */
+/** CC payment transfer when Firefly account_role is missing on the card. */
+export const creditCardPaymentTransferMissingRole: OmniRow = {
+  amount: "350.00",
+  type: "transfer",
+  source_account: "Main Checking",
+  source_type: "Asset account",
+  source_role: "Default account",
+  destination_account: "Amazon Prime Rewards Visa Signature",
+  destination_type: "Asset account",
+  destination_role: null,
+  budget: null,
+  category: null,
+  date: "2024-01-21",
+}
+
+/** Salary deposit — cash inflow, excluded from cash flow outflow charts. */
+export const salaryDeposit: OmniRow = {
+  amount: "5000.00",
+  type: "deposit",
+  source_account: "Employer",
+  source_type: "Revenue account",
+  source_role: null,
+  destination_account: "Main Checking",
+  destination_type: "Asset account",
+  destination_role: "Default account",
+  budget: null,
+  category: null,
+  date: "2024-01-01",
+}
+
+/** Bank → liability payment transfer. */
+export const liabilityPaymentTransfer: OmniRow = {
+  amount: "1200.00",
+  type: "transfer",
+  source_account: "Main Checking",
+  source_type: "Asset account",
+  source_role: "Default account",
+  destination_account: "Mortgage",
+  destination_type: "Liabilities account",
+  destination_role: null,
+  budget: "Housing",
+  category: "Mortgage Payment",
+  date: "2024-01-05",
+}
+
+/** Non-CC internal transfer — excluded from cash flow outflow. */
 export const savingsTransfer: OmniRow = {
   amount: "50.00",
   type: "transfer",

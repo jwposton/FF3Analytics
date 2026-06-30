@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { isCashMovementRow } from "@/lib/sankey"
-import { mainCheckingWithdrawal } from "@/test/fixtures/omniRows"
+import { mainCheckingWithdrawal, salaryDeposit } from "@/test/fixtures/omniRows"
 import type { OmniRow } from "@/types/NormalizedTransaction"
 
 const mockUseDateRange = vi.fn()
@@ -110,6 +110,10 @@ describe("CashFlowSankeyPage", () => {
     expect(screen.getByTestId("empty-message").textContent).toBe(
       "No cash movement in this date range",
     )
+  })
+
+  it("includes deposits in sankey population", () => {
+    expect(isCashMovementRow(salaryDeposit)).toBe(true)
   })
 
   it("renders chart for cash movement rows", () => {

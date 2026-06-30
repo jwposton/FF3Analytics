@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { isTrendCashOutflow } from "@/lib/spending"
+import { isCashFlowOutflow } from "@/lib/spending"
 import {
   creditCardPaymentTransfer,
   mainCheckingWithdrawal,
@@ -67,7 +67,7 @@ describe("CashFlowBarPage", () => {
     })
   })
 
-  it("uses isTrendCashOutflow filter and cash outflow copy", () => {
+  it("uses isCashFlowOutflow filter and cash outflow copy", () => {
     render(<CashFlowBarPage />)
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
@@ -84,7 +84,7 @@ describe("CashFlowBarPage", () => {
       creditCardPaymentTransfer,
       savingsTransfer,
     ]
-    expect(rows.filter(isTrendCashOutflow).length).toBeGreaterThan(0)
+    expect(rows.filter(isCashFlowOutflow).length).toBeGreaterThan(0)
 
     mockUseNormalizedTransactions.mockReturnValue({
       isPending: false,

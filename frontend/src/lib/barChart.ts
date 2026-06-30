@@ -1,5 +1,9 @@
 import type { OmniRow } from "@/types/NormalizedTransaction"
 
+import {
+  cashFlowBudgetLabel,
+  cashFlowCategoryLabel,
+} from "@/lib/cashFlowLabels"
 import { enumerateMonths, monthKey } from "@/lib/trends"
 
 const UNCategorized_LABEL = "Uncategorized"
@@ -26,6 +30,8 @@ export type BuildBarChartOptions = {
   start: string
   end: string
   filter?: { budget?: string }
+  /** Use cash-flow budget/category labels (CC Payment, payee fallback) for stacks and drilldown filter. */
+  useCashFlowLabels?: boolean
 }
 
 function parseAmount(amount: string | null): number {
@@ -46,7 +52,13 @@ function categoryLabel(category: string | null): string {
 function stackLabel(
   row: OmniRow,
   stackField: "budget" | "category",
+  useCashFlowLabels: boolean,
 ): string {
+  if (useCashFlowLabels) {
+    return stackField === "budget"
+      ? cashFlowBudgetLabel(row)
+      : cashFlowCategoryLabel(row)
+  }
   return stackField === "budget"
     ? budgetLabel(row.budget)
     : categoryLabel(row.category)
@@ -60,17 +72,18 @@ export function buildBarChartData(
   const [, stackField] = groupBy
   const months = enumerateMonths(options.start, options.end)
 
+  const useCashFlowLabels = options.useCashFlowLabels === true
   let filtered = rows
   if (options.filter?.budget) {
     const targetBudget = options.filter.budget
     filtered = filtered.filter(
-      (tx) => budgetLabel(tx.budget) === targetBudget,
+      (tx) => stackLabel(tx, "budget", useCashFlowLabels) === targetBudget,
     )
   }
 
   const stackTotals = new Map<string, number>()
   for (const row of filtered) {
-    const stack = stackLabel(row, stackField)
+    const stack = stackLabel(row, stackField, useCashFlowLabels)
     stackTotals.set(
       stack,
       (stackTotals.get(stack) ?? 0) + parseAmount(row.amount),
@@ -91,7 +104,7 @@ export function buildBarChartData(
 
   for (const row of filtered) {
     const month = monthKey(row.date)
-    const stack = stackLabel(row, stackField)
+    const stack = stackLabel(row, stackField, useCashFlowLabels)
     if (!data[month] || data[month][stack] === undefined) continue
     data[month][stack] += parseAmount(row.amount)
   }

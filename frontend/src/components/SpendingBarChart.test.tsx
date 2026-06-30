@@ -47,8 +47,39 @@ describe("SpendingBarChart", () => {
     )
 
     const legend = capturedOption?.legend as Record<string, unknown>
+    expect(legend?.orient).toBe("vertical")
+    expect(legend?.right).toBe(4)
     expect(legend?.triggerEvent).toBe(true)
     expect(legend?.selectedMode).not.toBe(false)
+  })
+
+  it("reserves fixed right margin when legend labels are long", () => {
+    const longLabelChart: BarChartData = {
+      months: ["2026-01"],
+      stacks: ["Whole Foods Market Downtown Location"],
+      data: {
+        "2026-01": { "Whole Foods Market Downtown Location": 100 },
+      },
+    }
+
+    render(
+      <SpendingBarChart
+        chartData={longLabelChart}
+        loading={false}
+        emptyMessage="No data"
+        onSelect={() => {}}
+      />,
+    )
+
+    const grid = capturedOption?.grid as Record<string, unknown>
+    expect(grid?.right).toBe(96)
+    const legend = capturedOption?.legend as Record<string, unknown>
+    expect(legend?.formatter).toBeTypeOf("function")
+    expect(
+      (legend.formatter as (name: string) => string)(
+        "Whole Foods Market Downtown Location",
+      ).endsWith("…"),
+    ).toBe(true)
   })
 
   it("registers legendselectchanged handler for legend drill", () => {

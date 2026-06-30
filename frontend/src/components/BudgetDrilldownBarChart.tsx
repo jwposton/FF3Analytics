@@ -7,6 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { OmniRow } from "@/types/NormalizedTransaction"
 import { buildBarChartData } from "@/lib/barChart"
 import { CHART_COLORS } from "@/lib/chartColors"
+import {
+  chartGridWithVerticalLegend,
+  verticalRightLegend,
+} from "@/lib/chartLegend"
 import { formatCurrency } from "@/lib/spending"
 
 type BudgetDrilldownBarChartProps = {
@@ -14,6 +18,7 @@ type BudgetDrilldownBarChartProps = {
   budget: string
   start: string
   end: string
+  useCashFlowLabels?: boolean
   onClear: () => void
 }
 
@@ -53,6 +58,7 @@ export function BudgetDrilldownBarChart({
   budget,
   start,
   end,
+  useCashFlowLabels = false,
   onClear,
 }: BudgetDrilldownBarChartProps) {
   const { months, stacks, data } = useMemo(
@@ -61,8 +67,9 @@ export function BudgetDrilldownBarChart({
         start,
         end,
         filter: { budget },
+        useCashFlowLabels,
       }),
-    [rows, budget, start, end],
+    [rows, budget, start, end, useCashFlowLabels],
   )
 
   const isEmpty = !hasNonZeroStacks(months, stacks, data)
@@ -78,7 +85,7 @@ export function BudgetDrilldownBarChart({
         name: stack,
         type: "bar" as const,
         stack: "total",
-        barMaxWidth: 36,
+        barMaxWidth: 32,
         data: months.map((month) => data[month]?.[stack] ?? 0),
         itemStyle: {
           color: CHART_COLORS[idx % CHART_COLORS.length],
@@ -105,14 +112,8 @@ export function BudgetDrilldownBarChart({
         trigger: "item",
         formatter: itemTooltipFormatter,
       },
-      legend: {
-        type: "scroll",
-        orient: "vertical",
-        right: 0,
-        top: "middle",
-        data: stacks,
-      },
-      grid: { left: 48, right: 120, bottom: 40, top: 24 },
+      legend: verticalRightLegend(stacks),
+      grid: chartGridWithVerticalLegend(stacks),
       xAxis: {
         type: "category",
         data: months,

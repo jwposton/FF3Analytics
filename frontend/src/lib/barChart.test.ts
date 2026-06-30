@@ -3,11 +3,14 @@ import { describe, expect, it } from "vitest"
 import type { OmniRow } from "@/types/NormalizedTransaction"
 import {
   creditCardPaymentTransfer,
+  creditCardPaymentTransferMissingRole,
+  creditCardPaymentTransferNoBudget,
   creditCardWithdrawal,
   mainCheckingWithdrawal,
 } from "@/test/fixtures/omniRows"
 import { buildBarChartData, barChartDataToLineSeries, TOTAL_LABEL } from "@/lib/barChart"
-import { isSpendingExpense, isTrendCashOutflow } from "@/lib/spending"
+import { CC_PAYMENT_BUDGET_LABEL } from "@/lib/cashFlowLabels"
+import { isCashFlowOutflow, isSpendingExpense } from "@/lib/spending"
 
 function makeRow(overrides: Partial<OmniRow> & Pick<OmniRow, "date">): OmniRow {
   return { ...mainCheckingWithdrawal, ...overrides }
@@ -99,14 +102,51 @@ describe("buildBarChartData", () => {
       creditCardPaymentTransfer,
       { ...creditCardPaymentTransfer, date: "2026-02-01", amount: "150.00" },
       mainCheckingWithdrawal,
-    ].filter(isTrendCashOutflow)
+    ].filter(isCashFlowOutflow)
     const result = buildBarChartData(rows, ["month", "budget"], {
       start: "2024-01-01",
       end: "2026-02-28",
+      useCashFlowLabels: true,
     })
     expect(result.stacks.length).toBeGreaterThan(0)
-    expect(result.data["2024-01"]?.["Credit Card Payment"]).toBeCloseTo(200, 2)
-    expect(result.data["2026-02"]?.["Credit Card Payment"]).toBeCloseTo(150, 2)
+    expect(result.data["2024-01"]?.[CC_PAYMENT_BUDGET_LABEL]).toBeCloseTo(200, 2)
+    expect(result.data["2026-02"]?.[CC_PAYMENT_BUDGET_LABEL]).toBeCloseTo(150, 2)
+  })
+
+  it("cash flow labels: missing-role CC transfers stack under CC Payment budget", () => {
+    const rows = [creditCardPaymentTransferMissingRole].filter(isCashFlowOutflow)
+    const result = buildBarChartData(rows, ["month", "budget"], {
+      start: "2024-01-01",
+      end: "2024-01-31",
+      useCashFlowLabels: true,
+    })
+    expect(result.stacks).toEqual([CC_PAYMENT_BUDGET_LABEL])
+    expect(result.data["2024-01"]?.[CC_PAYMENT_BUDGET_LABEL]).toBeCloseTo(350, 2)
+  })
+
+  it("cash flow labels: CC transfer category drilldown uses card account name", () => {
+    const rows = [creditCardPaymentTransfer, mainCheckingWithdrawal].filter(
+      isCashFlowOutflow,
+    )
+    const result = buildBarChartData(rows, ["month", "category"], {
+      start: "2024-01-01",
+      end: "2024-01-31",
+      filter: { budget: CC_PAYMENT_BUDGET_LABEL },
+      useCashFlowLabels: true,
+    })
+    expect(result.stacks).toEqual(["Chase VISA"])
+    expect(result.data["2024-01"]?.["Chase VISA"]).toBeCloseTo(200, 2)
+  })
+
+  it("cash flow labels: null-budget CC transfer stacks under CC Payment", () => {
+    const rows = [creditCardPaymentTransferNoBudget].filter(isCashFlowOutflow)
+    const result = buildBarChartData(rows, ["month", "budget"], {
+      start: "2024-01-01",
+      end: "2024-01-31",
+      useCashFlowLabels: true,
+    })
+    expect(result.stacks).toEqual([CC_PAYMENT_BUDGET_LABEL])
+    expect(result.data["2024-01"]?.[CC_PAYMENT_BUDGET_LABEL]).toBeCloseTo(200, 2)
   })
 
   it("uncategorized: empty category label maps to Uncategorized", () => {

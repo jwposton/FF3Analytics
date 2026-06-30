@@ -33,6 +33,8 @@ def _normalize_account_role(raw: str | None) -> str | None:
     if raw is None:
         return None
     key = raw.replace("_", "").lower()
+    if key == "asset":
+        return None
     return _ACCOUNT_ROLE_MAP.get(key, raw)
 
 
@@ -93,11 +95,10 @@ class FireflyClient:
                 for acct in payload.get("data", []):
                     aid = str(acct.get("id"))
                     attrs = acct.get("attributes", {})
-                    role_raw = attrs.get("account_role") or attrs.get("type")
                     accounts[aid] = {
                         "name": attrs.get("name"),
                         "type": _normalize_account_type(attrs.get("type")),
-                        "role": _normalize_account_role(role_raw),
+                        "role": _normalize_account_role(attrs.get("account_role")),
                     }
                 pagination = payload.get("meta", {}).get("pagination", {})
                 current = pagination.get("current_page", 1)

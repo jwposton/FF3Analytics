@@ -1,6 +1,15 @@
 import type { OmniRow } from "@/types/NormalizedTransaction"
 
-import { isBankAccount, isCreditCard } from "@/lib/accounts"
+import {
+  isBankAccount,
+  isCreditCard,
+  isSpendingBankAccount,
+  normalizeAccountType,
+} from "@/lib/accounts"
+import {
+  cashFlowBudgetLabel,
+  cashFlowCategoryLabel,
+} from "@/lib/cashFlowLabels"
 
 const UNCategorized_LABEL = "Uncategorized"
 
@@ -45,27 +54,35 @@ function categoryLabel(category: string | null): string {
   return category
 }
 
-function cashFlowBudgetOut(tx: OmniRow, destVal: string): string {
-  const budget = tx.budget
-  if (budget != null && budget !== "") return budget
-  if (isCreditCard(tx.destination_type, tx.destination_role)) {
-    return "Credit Card Payment"
-  }
-  return destVal || UNCategorized_LABEL
-}
-
-function cashFlowCategoryOut(tx: OmniRow, destVal: string): string {
-  const category = tx.category
-  if (category != null && category !== "") return category
-  if (isCreditCard(tx.destination_type, tx.destination_role)) {
-    return destVal ? `${destVal} Payment` : UNCategorized_LABEL
-  }
-  return destVal || UNCategorized_LABEL
-}
-
 function payeeLabel(row: OmniRow): string {
   const name = (row.destination_account ?? "").trim()
   return name || "Unknown Payee"
+}
+
+const BANK_ACCOUNT_TYPE_KEY = "Bank Account (T)"
+const BANK_ACCOUNT_TYPE_DISPLAY = "Bank Accounts"
+const CREDIT_CARD_TYPE_KEY = "Credit Card (T)"
+const CREDIT_CARD_TYPE_DISPLAY = "Credit Cards"
+
+/**
+ * Leftmost Spending Sankey layer — matches FireflyReports App.tsx:
+ * defaultAsset → Bank Accounts; any other asset source → Credit Cards.
+ */
+export function spendingAccountTypeNode(
+  row: OmniRow,
+): { key: string; display: string } | null {
+  if (!(row.source_account ?? "").trim()) return null
+  const type = normalizeAccountType(row.source_type)
+  if (type !== "Asset account") return null
+
+  if (isSpendingBankAccount(row.source_type, row.source_role)) {
+    return { key: BANK_ACCOUNT_TYPE_KEY, display: BANK_ACCOUNT_TYPE_DISPLAY }
+  }
+  if (isCreditCard(row.source_type, row.source_role)) {
+    return { key: CREDIT_CARD_TYPE_KEY, display: CREDIT_CARD_TYPE_DISPLAY }
+  }
+  // Unspecified or non-default asset role → Credit Cards (not Bank Accounts)
+  return { key: CREDIT_CARD_TYPE_KEY, display: CREDIT_CARD_TYPE_DISPLAY }
 }
 
 export function computeTopCategoryNames(
@@ -99,6 +116,7 @@ function mergeLinks(links: SankeyLink[]): SankeyLink[] {
   })
 }
 
+/** Cash Flow Sankey population: bank↔non-bank movements including deposits and transfer-in. */
 export function isCashMovementRow(row: OmniRow): boolean {
   const sourceIsBank = isBankAccount(row.source_type, row.source_role)
   const destIsBank = isBankAccount(row.destination_type, row.destination_role)
@@ -203,7 +221,12 @@ export function buildSpendingSankeyData(
     const amount = parseAmount(r.amount)
     if (!amount) continue
 
-    if (r.source_account) {
+    const accountType = spendingAccountTypeNode(r)
+    if (accountType && r.source_account) {
+      addNode(accountType.key, accountType.display)
+      addNode(`${r.source_account} (A)`, r.source_account)
+      addLink(accountType.key, `${r.source_account} (A)`, amount)
+    } else if (r.source_account) {
       addNode(`${r.source_account} (A)`, r.source_account)
     }
 
@@ -349,8 +372,8 @@ export function buildCashFlowSankeyData(
 
     const sourceVal = (tx.source_account ?? "").trim()
     const destVal = (tx.destination_account ?? "").trim()
-    const budgetOut = cashFlowBudgetOut(tx, destVal)
-    const categoryOut = cashFlowCategoryOut(tx, destVal)
+    const budgetOut = cashFlowBudgetLabel(tx)
+    const categoryOut = cashFlowCategoryLabel(tx)
 
     const nodes: { key: string; label: string }[] = []
 
@@ -509,17 +532,15 @@ export function filterRowsForCashFlowDrilldown(
   }
 
   if (selected.type === "Budget") {
-    return rows.filter((r) => {
-      const destVal = (r.destination_account ?? "").trim()
-      return cashFlowBudgetOut(r, destVal) === selected.displayName
-    })
+    return rows.filter(
+      (r) => cashFlowBudgetLabel(r) === selected.displayName,
+    )
   }
 
   if (selected.type === "Category") {
-    return rows.filter((r) => {
-      const destVal = (r.destination_account ?? "").trim()
-      return cashFlowCategoryOut(r, destVal) === selected.displayName
-    })
+    return rows.filter(
+      (r) => cashFlowCategoryLabel(r) === selected.displayName,
+    )
   }
 
   if (selected.type === "Source") {

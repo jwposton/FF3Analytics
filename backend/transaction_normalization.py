@@ -24,8 +24,22 @@ def assign_transfer_labels(row: dict[str, Any]) -> dict[str, Any]:
     if row.get("type") != "transfer":
         return row
     dest_role = row.get("destination_role") or ""
+    dest_type = row.get("destination_type") or ""
     dest_name = row.get("destination_account") or ""
-    if dest_role == "Credit card":
+    source_type = row.get("source_type") or ""
+    source_role = row.get("source_role") or ""
+
+    is_cc = dest_role == "Credit card"
+    if (
+        not is_cc
+        and dest_type == "Asset account"
+        and dest_role not in ("Default account", "Savings")
+        and source_type == "Asset account"
+        and source_role in ("Default account", "Savings")
+    ):
+        is_cc = True
+
+    if is_cc:
         row["budget"] = "Credit Card Payment"
         row["category"] = f"{dest_name} Payment"
     else:

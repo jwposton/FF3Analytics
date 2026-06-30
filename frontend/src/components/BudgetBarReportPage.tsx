@@ -14,6 +14,7 @@ export type BudgetBarReportPageProps = {
   mainChartTitle: string
   emptyMessage: string
   yAxisName: string
+  useCashFlowLabels?: boolean
 }
 
 export function BudgetBarReportPage({
@@ -22,6 +23,7 @@ export function BudgetBarReportPage({
   mainChartTitle,
   emptyMessage,
   yAxisName,
+  useCashFlowLabels = false,
 }: BudgetBarReportPageProps) {
   const { committedRange } = useDateRange()
   const { start: committedStart, end: committedEnd } = committedRange
@@ -43,8 +45,9 @@ export function BudgetBarReportPage({
       buildBarChartData(sliceRows, ["month", "budget"], {
         start: committedStart,
         end: committedEnd,
+        useCashFlowLabels,
       }),
-    [sliceRows, committedStart, committedEnd],
+    [sliceRows, committedStart, committedEnd, useCashFlowLabels],
   )
 
   return (
@@ -91,6 +94,7 @@ export function BudgetBarReportPage({
               budget={selectedBudget}
               start={committedStart}
               end={committedEnd}
+              useCashFlowLabels={useCashFlowLabels}
               onClear={() => setSelectedBudget(null)}
             />
           )}

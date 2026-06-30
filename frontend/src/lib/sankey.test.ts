@@ -5,6 +5,7 @@ import { isBankAccount } from "@/lib/accounts"
 import {
   creditCardPaymentTransfer,
   creditCardPaymentTransferNoBudget,
+  creditCardPaymentTransferNoBudget,
   creditCardWithdrawal,
   mainCheckingWithdrawal,
 } from "@/test/fixtures/omniRows"
@@ -20,6 +21,7 @@ import {
   MAX_VISIBLE_BANKS,
   parseCashFlowNodeSelection,
   shouldBucketBanks,
+  spendingAccountTypeNode,
 } from "@/lib/sankey"
 
 function makeRow(overrides: Partial<OmniRow> & Pick<OmniRow, "date">): OmniRow {
@@ -31,23 +33,76 @@ const spendingRows = [
   creditCardWithdrawal,
 ].filter(isSpendingExpense)
 
+describe("spendingAccountTypeNode", () => {
+  it("classifies credit card before bank when role is Credit card", () => {
+    expect(spendingAccountTypeNode(creditCardWithdrawal)).toEqual({
+      key: "Credit Card (T)",
+      display: "Credit Cards",
+    })
+    expect(spendingAccountTypeNode(mainCheckingWithdrawal)).toEqual({
+      key: "Bank Account (T)",
+      display: "Bank Accounts",
+    })
+  })
+
+  it("classifies raw creditCard API role to Credit Cards bucket", () => {
+    const row = {
+      ...creditCardWithdrawal,
+      source_role: "creditCard",
+    }
+    expect(spendingAccountTypeNode(row)?.display).toBe("Credit Cards")
+    const data = buildSpendingSankeyData([row], "source-budget-category")
+    expect(
+      data.links.some(
+        (l) =>
+          l.source === "Credit Card (T)" && l.target === "Chase VISA (A)",
+      ),
+    ).toBe(true)
+  })
+})
+
 describe("spending:", () => {
-  it("does NOT emit Bank Account (T) or Credit Card (T) nodes; leftmost are account (A)", () => {
+  it("emits Bank Accounts and Credit Cards type nodes with account children", () => {
     const data = buildSpendingSankeyData(
       spendingRows,
       "source-budget-category",
     )
-    expect(data.nodes.some((n) => n.name.endsWith("(T)"))).toBe(false)
-    expect(data.nodes.some((n) => n.name.endsWith("(A)"))).toBe(true)
     const displayNames = data.nodes.map((n) => n.displayName)
+    expect(displayNames).toContain("Bank Accounts")
+    expect(displayNames).toContain("Credit Cards")
     expect(displayNames).toContain("Main Checking")
+    expect(displayNames).toContain("Chase VISA")
     expect(displayNames).toContain("Essentials")
     expect(displayNames).toContain("Food")
-    expect(displayNames).not.toContain("Bank Accounts")
-    expect(displayNames).not.toContain("Credit Cards")
   })
 
-  it("links account (A) directly to budget (B) without type intermediary", () => {
+  it("routes bank rows through Bank Account (T) and CC rows through Credit Card (T)", () => {
+    const data = buildSpendingSankeyData(
+      spendingRows,
+      "source-budget-category",
+    )
+    expect(
+      data.links.some(
+        (l) =>
+          l.source === "Bank Account (T)" &&
+          l.target === "Main Checking (A)",
+      ),
+    ).toBe(true)
+    expect(
+      data.links.some(
+        (l) =>
+          l.source === "Credit Card (T)" && l.target === "Chase VISA (A)",
+      ),
+    ).toBe(true)
+    expect(
+      data.links.some(
+        (l) =>
+          l.source === "Bank Account (T)" && l.target === "Chase VISA (A)",
+      ),
+    ).toBe(false)
+  })
+
+  it("links type (T) → account (A) → budget (B)", () => {
     const data = buildSpendingSankeyData(
       spendingRows,
       "source-budget-category",
@@ -56,7 +111,7 @@ describe("spending:", () => {
       (l) => l.source.endsWith("(A)") && l.target.endsWith("(B)"),
     )
     expect(accountToBudget.length).toBeGreaterThan(0)
-    expect(data.links.some((l) => l.source.endsWith("(T)"))).toBe(false)
+    expect(data.links.some((l) => l.source.endsWith("(T)"))).toBe(true)
   })
 
   it("maps null budget to Uncategorized, not Undefined", () => {
@@ -160,32 +215,22 @@ describe("cashFlow:", () => {
     expect(data.nodes.some((n) => n.name === "BankAccounts_BANK")).toBe(false)
   })
 
-  it("preserves Credit Card Payment budget from CC payment transfers", () => {
+  it("preserves CC Payment budget from CC payment transfers", () => {
     const data = buildCashFlowSankeyData([creditCardPaymentTransfer], true)
-    expect(
-      data.nodes.some((n) => n.displayName === "Credit Card Payment"),
-    ).toBe(true)
+    expect(data.nodes.some((n) => n.displayName === "CC Payment")).toBe(true)
   })
 
-  it("falls back to Credit Card Payment budget when CC transfer has null budget", () => {
+  it("falls back to CC Payment budget when CC transfer has null budget", () => {
     const data = buildCashFlowSankeyData(
       [creditCardPaymentTransferNoBudget],
       true,
     )
-    expect(
-      data.nodes.some((n) => n.displayName === "Credit Card Payment"),
-    ).toBe(true)
-    expect(
-      data.nodes.some((n) => n.displayName === "Chase VISA Payment"),
-    ).toBe(true)
-    const budgetNode = data.nodes.find(
-      (n) => n.displayName === "Credit Card Payment",
-    )
-    const catNode = data.nodes.find(
-      (n) => n.displayName === "Chase VISA Payment",
-    )
-    expect(budgetNode?.name).toBe("Credit Card Payment_BUDGET")
-    expect(catNode?.name).toBe("Chase VISA Payment_CAT")
+    expect(data.nodes.some((n) => n.displayName === "CC Payment")).toBe(true)
+    expect(data.nodes.some((n) => n.displayName === "Chase VISA")).toBe(true)
+    const budgetNode = data.nodes.find((n) => n.displayName === "CC Payment")
+    const catNode = data.nodes.find((n) => n.displayName === "Chase VISA")
+    expect(budgetNode?.name).toBe("CC Payment_BUDGET")
+    expect(catNode?.name).toBe("Chase VISA_CAT")
   })
 
   it("uses destVal as budgetOut for bank→non-bank transfer with empty budget when not CC", () => {
@@ -366,6 +411,17 @@ describe("drilldown:", () => {
     })
     expect(filtered).toHaveLength(1)
     expect(filtered[0].source_account).toBe("Main Checking")
+  })
+
+  it("filters AccountType Credit Cards via isCreditCard", () => {
+    const rows = [mainCheckingWithdrawal, creditCardWithdrawal]
+    const filtered = filterRowsForDrilldown(rows, {
+      name: "Credit Card (T)",
+      type: "AccountType",
+      displayName: "Credit Cards",
+    })
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0].source_account).toBe("Chase VISA")
   })
 
   it("selecting Other (C) returns rows whose category is NOT in top-N set", () => {

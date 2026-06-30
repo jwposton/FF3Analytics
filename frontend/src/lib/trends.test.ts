@@ -13,7 +13,7 @@ import {
   rankCategoriesByRangeTotal,
   sumByMonth,
 } from "@/lib/trends"
-import { isTrendCashOutflow } from "@/lib/spending"
+import { isCashFlowOutflow } from "@/lib/spending"
 
 function makeCategoryRow(
   category: string | null,
@@ -82,7 +82,7 @@ describe("rankCategoriesByRangeTotal", () => {
     const rows = [
       makeCategoryRow("Food", "100", "2024-01-01"),
       uncategorizedWithdrawal,
-    ].filter(isTrendCashOutflow)
+    ].filter(isCashFlowOutflow)
     const { series } = rankCategoriesByRangeTotal(rows, 8)
     expect(series).toContain("Uncategorized")
     expect(series).toContain("Food")

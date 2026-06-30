@@ -123,6 +123,26 @@ def test_transfer_to_credit_card_labels():
     assert rows[0]["category"] == "Chase VISA Payment"
 
 
+def test_transfer_to_credit_card_labels_when_role_missing():
+    normalize_transactions, _, _ = _import_normalization()
+    rows = normalize_transactions(
+        [
+            {
+                "type": "transfer",
+                "amount": "350",
+                "source_type": "Asset account",
+                "source_role": "Default account",
+                "destination_name": "Amazon Prime Rewards Visa Signature",
+                "destination_type": "Asset account",
+                "destination_role": None,
+                "date": "2024-01-21",
+            }
+        ]
+    )
+    assert rows[0]["budget"] == "Credit Card Payment"
+    assert rows[0]["category"] == "Amazon Prime Rewards Visa Signature Payment"
+
+
 def test_transfer_non_cc_category():
     normalize_transactions, _, _ = _import_normalization()
     rows = normalize_transactions(

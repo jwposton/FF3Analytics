@@ -1,6 +1,6 @@
 import type { OmniRow } from "@/types/NormalizedTransaction"
 
-import { isTrendCashOutflow } from "@/lib/spending"
+import { isCashFlowOutflow } from "@/lib/spending"
 
 const UNCategorized_LABEL = "Uncategorized"
 const OTHER_LABEL = "Other"
@@ -131,7 +131,7 @@ export function buildTrendSeries(
   options: BuildTrendSeriesOptions,
 ): TrendSeriesResult {
   const { rows, start, end, mode, topN = 8 } = options
-  const cashRows = rows.filter(isTrendCashOutflow)
+  const cashRows = rows.filter(isCashFlowOutflow)
   const months = enumerateMonths(start, end)
   const monthlyTotals = sumByMonth(cashRows, months)
   const totalData = mapToSeriesData(monthlyTotals, months)

@@ -1,5 +1,8 @@
 import type { OmniRow } from "@/types/NormalizedTransaction"
 
+import { isCreditCardPaymentFlow } from "@/lib/cashFlowLabels"
+import { isBankAccount, isCreditCard, isSpendingBankAccount } from "@/lib/accounts"
+
 export function isSpendingWithdrawal(row: OmniRow): boolean {
   return (
     row.type === "withdrawal" &&
@@ -8,24 +11,46 @@ export function isSpendingWithdrawal(row: OmniRow): boolean {
   )
 }
 
-/** Expanded cash-outflow slice for trends (D-17): bank withdrawals + CC payment transfers. */
-export function isTrendCashOutflow(row: OmniRow): boolean {
-  if (
-    row.type === "withdrawal" &&
-    row.source_type === "Asset account" &&
-    row.source_role !== "Credit card"
-  ) {
+/**
+ * Cash Flow bar/line population: cash leaving bank accounts — withdrawals to
+ * expense/liability and transfers to any non-bank destination (CC payments,
+ * liability payments, etc.). Excludes deposits/inflows, CC purchases, and bank↔bank moves.
+ * Cash Flow Sankey uses {@link isCashMovementRow} instead (includes deposits).
+ */
+export function isCashFlowOutflow(row: OmniRow): boolean {
+  if (isCreditCard(row.source_type, row.source_role)) return false
+
+  const sourceIsBank = isBankAccount(row.source_type, row.source_role)
+  if (!sourceIsBank) return false
+
+  if (row.type === "withdrawal") {
+    // Card purchases mislabeled as bank (missing credit-card role) must not count as cash flow
+    if (
+      row.destination_type === "Expense account" &&
+      !isSpendingBankAccount(row.source_type, row.source_role)
+    ) {
+      return false
+    }
     return true
   }
-  if (row.type === "transfer" && row.destination_role === "Credit card") {
-    return true
+
+  if (row.type === "transfer") {
+    if (isCreditCardPaymentFlow(row)) return true
+    const destIsBank = isBankAccount(row.destination_type, row.destination_role)
+    return !destIsBank
   }
+
   return false
 }
 
+/** @deprecated Use isCashFlowOutflow — kept for legacy trend helpers. */
+export function isTrendCashOutflow(row: OmniRow): boolean {
+  return isCashFlowOutflow(row)
+}
+
 /**
- * Spending bar slice (D-09–D-11): asset-account withdrawals including credit card
- * purchases; excludes transfers and deposits.
+ * Spending chart population (bar, line, sankey): all asset-account withdrawals
+ * including credit card purchases; excludes transfers and deposits.
  */
 export function isSpendingExpense(row: OmniRow): boolean {
   return row.type === "withdrawal" && row.source_type === "Asset account"

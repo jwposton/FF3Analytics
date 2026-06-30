@@ -1,10 +1,11 @@
 import { BudgetLineReportPage } from "@/components/BudgetLineReportPage"
-import { isTrendCashOutflow } from "@/lib/spending"
+import { isCashFlowOutflow } from "@/lib/spending"
 
 export function CashFlowLinePage() {
   return (
     <BudgetLineReportPage
-      filter={isTrendCashOutflow}
+      filter={isCashFlowOutflow}
+      useCashFlowLabels
       pageTitle="Cash Flow"
       lineChartTitle="Cash flow trends by month"
       emptyMessage="No cash outflow in this date range"

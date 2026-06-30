@@ -7,6 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { TrendLineSeries } from "@/lib/barChart"
 import { TOTAL_LABEL } from "@/lib/barChart"
 import { CHART_COLORS } from "@/lib/chartColors"
+import {
+  chartGridWithVerticalLegend,
+  verticalRightLegend,
+} from "@/lib/chartLegend"
 import { formatCurrency } from "@/lib/spending"
 
 type BudgetLineChartProps = {
@@ -79,20 +83,18 @@ export function BudgetLineChart({
       },
     }))
 
+    const legendLabels = series.map((s) => s.name)
+
     return {
       tooltip: {
         trigger: "item",
         formatter: itemTooltipFormatter,
       },
       legend: {
-        type: "scroll",
-        orient: "vertical",
-        right: 0,
-        top: "middle",
-        data: series.map((s) => s.name),
+        ...verticalRightLegend(legendLabels),
         triggerEvent: true,
       },
-      grid: { left: 48, right: 120, bottom: 40, top: 24 },
+      grid: chartGridWithVerticalLegend(legendLabels),
       xAxis: {
         type: "category",
         data: months,

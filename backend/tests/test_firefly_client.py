@@ -108,6 +108,78 @@ def test_split_journal_produces_two_rows():
     assert len(flat) == 2
 
 
+def test_cc_withdrawal_source_role_is_credit_card():
+    payload = {
+        "data": [
+            {
+                "type": "transactions",
+                "id": "300",
+                "attributes": {
+                    "transactions": [
+                        {
+                            "type": "withdrawal",
+                            "amount": "42.00",
+                            "source_id": "3",
+                            "destination_id": "2",
+                            "source_name": "Chase VISA",
+                            "destination_name": "Store",
+                            "date": "2024-01-16T12:00:00+00:00",
+                        }
+                    ]
+                },
+            }
+        ],
+        "meta": {"pagination": {"current_page": 1, "total_pages": 1}},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/accounts"):
+            return httpx.Response(200, json=load_fixture("accounts.json"))
+        return httpx.Response(200, json=payload)
+
+    client = FireflyClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://firefly.example",
+        api_token="tok",
+    )
+    flat = asyncio.run(client.fetch_splits("2024-01-01", "2024-01-31"))
+    cc_rows = [r for r in flat if r.get("source_name") == "Chase VISA"]
+    assert len(cc_rows) == 1
+    assert cc_rows[0].get("source_role") == "Credit card"
+    assert cc_rows[0].get("source_type") == "Asset account"
+
+
+def test_account_role_not_replaced_by_account_type():
+    accounts_payload = {
+        "data": [
+            {
+                "type": "accounts",
+                "id": "9",
+                "attributes": {
+                    "name": "Mystery Asset",
+                    "type": "asset",
+                    "account_role": None,
+                },
+            }
+        ],
+        "meta": {"pagination": {"current_page": 1, "total_pages": 1}},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/accounts"):
+            return httpx.Response(200, json=accounts_payload)
+        return httpx.Response(200, json={"data": [], "meta": {"pagination": {"current_page": 1, "total_pages": 1}}})
+
+    client = FireflyClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://firefly.example",
+        api_token="tok",
+    )
+    accounts = asyncio.run(client.fetch_accounts())
+    assert accounts["9"]["role"] is None
+    assert accounts["9"]["type"] == "Asset account"
+
+
 def test_includes_transfer_type():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("/accounts"):

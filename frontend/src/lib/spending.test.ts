@@ -3,15 +3,17 @@ import { describe, expect, it } from "vitest"
 import {
   creditCardPaymentTransfer,
   creditCardWithdrawal,
+  liabilityPaymentTransfer,
   mainCheckingWithdrawal,
+  salaryDeposit,
   savingsTransfer,
   spendingRowsForTopCategory,
   spendingRowsForTotal,
 } from "@/test/fixtures/omniRows"
 import {
+  isCashFlowOutflow,
   isSpendingExpense,
   isSpendingWithdrawal,
-  isTrendCashOutflow,
   spendingWithdrawalTotal,
   topCategoryBySpend,
 } from "@/lib/spending"
@@ -38,21 +40,34 @@ describe("isSpendingExpense", () => {
   })
 })
 
-describe("isTrendCashOutflow", () => {
-  it("trend: includes bank asset withdrawals", () => {
-    expect(isTrendCashOutflow(mainCheckingWithdrawal)).toBe(true)
+describe("isCashFlowOutflow", () => {
+  it("includes bank asset withdrawals", () => {
+    expect(isCashFlowOutflow(mainCheckingWithdrawal)).toBe(true)
   })
 
-  it("trend: includes credit card payment transfers", () => {
-    expect(isTrendCashOutflow(creditCardPaymentTransfer)).toBe(true)
+  it("includes credit card payment transfers", () => {
+    expect(isCashFlowOutflow(creditCardPaymentTransfer)).toBe(true)
   })
 
-  it("trend: excludes credit card purchase withdrawals", () => {
-    expect(isTrendCashOutflow(creditCardWithdrawal)).toBe(false)
+  it("includes bank transfers to liability accounts", () => {
+    expect(isCashFlowOutflow(liabilityPaymentTransfer)).toBe(true)
   })
 
-  it("trend: excludes non-CC internal transfers", () => {
-    expect(isTrendCashOutflow(savingsTransfer)).toBe(false)
+  it("excludes credit card purchase withdrawals (Spending only)", () => {
+    expect(isCashFlowOutflow(creditCardWithdrawal)).toBe(false)
+  })
+
+  it("excludes CC purchases mislabeled with missing source role", () => {
+    const mislabeled = { ...creditCardWithdrawal, source_role: null }
+    expect(isCashFlowOutflow(mislabeled)).toBe(false)
+  })
+
+  it("excludes bank-to-bank internal transfers", () => {
+    expect(isCashFlowOutflow(savingsTransfer)).toBe(false)
+  })
+
+  it("excludes salary deposits (inflows)", () => {
+    expect(isCashFlowOutflow(salaryDeposit)).toBe(false)
   })
 })
 

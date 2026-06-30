@@ -6,6 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { BarChartData } from "@/lib/barChart"
 import { CHART_COLORS } from "@/lib/chartColors"
+import {
+  chartGridWithVerticalLegend,
+  verticalRightLegend,
+} from "@/lib/chartLegend"
 import { formatCurrency } from "@/lib/spending"
 
 type SpendingBarChartProps = {
@@ -96,14 +100,10 @@ export function SpendingBarChart({
         formatter: itemTooltipFormatter,
       },
       legend: {
-        type: "scroll",
-        orient: "vertical",
-        right: 0,
-        top: "middle",
-        data: stacks,
+        ...verticalRightLegend(stacks),
         triggerEvent: true,
       },
-      grid: { left: 48, right: 120, bottom: 40, top: 24 },
+      grid: chartGridWithVerticalLegend(stacks),
       xAxis: {
         type: "category",
         data: months,

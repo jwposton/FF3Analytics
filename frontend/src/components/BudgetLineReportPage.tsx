@@ -21,6 +21,7 @@ export type BudgetLineReportPageProps = {
   lineChartTitle: string
   emptyMessage: string
   yAxisName: string
+  useCashFlowLabels?: boolean
 }
 
 export function BudgetLineReportPage({
@@ -29,6 +30,7 @@ export function BudgetLineReportPage({
   lineChartTitle,
   emptyMessage,
   yAxisName,
+  useCashFlowLabels = false,
 }: BudgetLineReportPageProps) {
   const { committedRange } = useDateRange()
   const { start: committedStart, end: committedEnd } = committedRange
@@ -51,8 +53,9 @@ export function BudgetLineReportPage({
       buildBarChartData(sliceRows, ["month", "budget"], {
         start: committedStart,
         end: committedEnd,
+        useCashFlowLabels,
       }),
-    [sliceRows, committedStart, committedEnd],
+    [sliceRows, committedStart, committedEnd, useCashFlowLabels],
   )
 
   const lineSeries = useMemo(
@@ -122,6 +125,7 @@ export function BudgetLineReportPage({
               budget={selectedBudget}
               start={committedStart}
               end={committedEnd}
+              useCashFlowLabels={useCashFlowLabels}
               onClear={() => setSelectedBudget(null)}
             />
           )}

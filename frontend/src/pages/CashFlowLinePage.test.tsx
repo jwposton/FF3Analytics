@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
-import { isTrendCashOutflow } from "@/lib/spending"
+import { isCashFlowOutflow } from "@/lib/spending"
 
 vi.mock("@/components/BudgetLineReportPage", () => ({
   BudgetLineReportPage: ({
@@ -19,7 +19,7 @@ vi.mock("@/components/BudgetLineReportPage", () => ({
   }) => (
     <div
       data-testid="budget-line-report"
-      data-filter={filter === isTrendCashOutflow ? "cash-outflow" : "other"}
+      data-filter={filter === isCashFlowOutflow ? "cash-outflow" : "other"}
       data-page-title={pageTitle}
       data-empty-message={emptyMessage}
       data-line-chart-title={lineChartTitle}
@@ -31,7 +31,7 @@ vi.mock("@/components/BudgetLineReportPage", () => ({
 import { CashFlowLinePage } from "./CashFlowLinePage"
 
 describe("CashFlowLinePage", () => {
-  it("uses isTrendCashOutflow filter and cash outflow copy", () => {
+  it("uses isCashFlowOutflow filter and cash outflow copy", () => {
     const { getByTestId } = render(<CashFlowLinePage />)
     const el = getByTestId("budget-line-report")
 
