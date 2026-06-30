@@ -32,9 +32,9 @@ const generalNavItems = [
 const spendingNavItems = [
   {
     to: "/reports/spending",
-    label: "Spending",
+    label: "Bar",
     icon: BarChart3,
-    end: false,
+    end: true,
   },
   {
     to: "/reports/sankey",
