@@ -7,6 +7,7 @@ import {
   mainCheckingWithdrawal,
 } from "@/test/fixtures/omniRows"
 import { buildBarChartData } from "@/lib/barChart"
+import { isSpendingExpense, isTrendCashOutflow } from "@/lib/spending"
 
 function makeRow(overrides: Partial<OmniRow> & Pick<OmniRow, "date">): OmniRow {
   return { ...mainCheckingWithdrawal, ...overrides }
@@ -79,18 +80,33 @@ describe("buildBarChartData", () => {
     expect(result.data["2024-01"]?.["Uncategorized"]).toBeCloseTo(100, 2)
   })
 
-  it("slice: transfer rows do not contribute to totals", () => {
+  it("slice: transfer rows do not contribute when caller pre-filters spending", () => {
     const rows = [
       makeRow({ date: "2026-01-10", budget: "Essentials", amount: "75.50" }),
       creditCardPaymentTransfer,
       { ...creditCardPaymentTransfer, date: "2026-01-15" },
-    ]
+    ].filter(isSpendingExpense)
     const result = buildBarChartData(rows, ["month", "budget"], {
       start: "2026-01-01",
       end: "2026-01-31",
     })
     expect(result.data["2026-01"]?.["Essentials"]).toBeCloseTo(75.5, 2)
     expect(result.stacks).toEqual(["Essentials"])
+  })
+
+  it("slice: cash-outflow pre-filtered rows produce non-empty stacks", () => {
+    const rows = [
+      creditCardPaymentTransfer,
+      { ...creditCardPaymentTransfer, date: "2026-02-01", amount: "150.00" },
+      mainCheckingWithdrawal,
+    ].filter(isTrendCashOutflow)
+    const result = buildBarChartData(rows, ["month", "budget"], {
+      start: "2024-01-01",
+      end: "2026-02-28",
+    })
+    expect(result.stacks.length).toBeGreaterThan(0)
+    expect(result.data["2024-01"]?.["Credit Card Payment"]).toBeCloseTo(200, 2)
+    expect(result.data["2026-02"]?.["Credit Card Payment"]).toBeCloseTo(150, 2)
   })
 
   it("uncategorized: empty category label maps to Uncategorized", () => {
