@@ -5,6 +5,7 @@ import type { EChartsOption } from "echarts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { TrendChartType } from "@/lib/trendsChartType"
+import { CHART_COLORS } from "@/lib/chartColors"
 import { formatCurrency } from "@/lib/spending"
 
 export type TrendLineSeries = {
@@ -20,24 +21,6 @@ type SpendingTrendsChartProps = {
   loading: boolean
   emptyMessage: string
 }
-
-const CHART_COLORS = [
-  "#6EE7B7",
-  "#60A5FA",
-  "#F472B6",
-  "#FBBF24",
-  "#34D399",
-  "#818CF8",
-  "#F87171",
-  "#C084FC",
-  "#FCD34D",
-  "#4ADE80",
-  "#A78BFA",
-  "#FCA5A5",
-  "#FDE68A",
-  "#7DD3FC",
-  "#E879F9",
-]
 
 function hasNonZeroData(series: TrendLineSeries[]): boolean {
   return series.some((s) => s.data.some((v) => v > 0))

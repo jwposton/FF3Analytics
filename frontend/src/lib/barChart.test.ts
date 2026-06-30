@@ -5,13 +5,10 @@ import {
   creditCardPaymentTransfer,
   creditCardWithdrawal,
   mainCheckingWithdrawal,
-  transportWithdrawal,
 } from "@/test/fixtures/omniRows"
 import { buildBarChartData } from "@/lib/barChart"
 
-function makeRow(
-  overrides: Partial<OmniRow> & Pick<OmniRow, "date" | "amount">,
-): OmniRow {
+function makeRow(overrides: Partial<OmniRow> & Pick<OmniRow, "date">): OmniRow {
   return { ...mainCheckingWithdrawal, ...overrides }
 }
 
