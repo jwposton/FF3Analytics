@@ -75,7 +75,7 @@ export function TransactionTable({
     return (
       <div className="rounded-lg border">
         <Table>
-          <TableHeader className="sticky top-0 z-10 bg-background">
+          <TableHeader className="sticky top-0 z-10 bg-muted/50">
             <TableRow>
               {COLUMNS.map((col) => (
                 <TableHead key={col.key}>{col.label}</TableHead>
@@ -111,7 +111,7 @@ export function TransactionTable({
   return (
     <div className="max-h-[70vh] overflow-auto rounded-lg border">
       <Table>
-        <TableHeader className="sticky top-0 z-10 bg-background">
+        <TableHeader className="sticky top-0 z-10 bg-muted/50">
           <TableRow>
             {COLUMNS.map((col) => (
               <TableHead key={col.key} aria-sort={ariaSortValue(col.key, sortKey, sortDir)}>

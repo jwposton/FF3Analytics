@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { TrendLineSeries } from "@/lib/barChart"
 import { TOTAL_LABEL } from "@/lib/barChart"
 import { CHART_COLORS } from "@/lib/chartColors"
+import { categoryAxisColumnStripes } from "@/lib/chartStripes"
 import {
   chartGridWithVerticalLegend,
   verticalRightLegend,
@@ -99,6 +100,7 @@ export function BudgetLineChart({
         type: "category",
         data: months,
         axisLabel: { rotate: 30 },
+        ...categoryAxisColumnStripes(),
       },
       yAxis: {
         type: "value",

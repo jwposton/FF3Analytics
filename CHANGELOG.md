@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MoM variance data tables** — Budget × month numeric tables below Compare and Trend charts on Spending and Cash Flow variance pages; drilldown shows category rows for the selected budget
+- **MoM compare table columns** — vs Average adds a rolling mean/median summary column; vs Month shows the two selected months plus a Δ column
+- **MoM trend table** — Month-over-month delta columns with red/green intensity heatmap
+- **Chart zebra striping** — Alternating band backgrounds on MoM and other bar/line charts for easier row tracking
 - **Firefly reference data cache** — In-process 2h TTL cache for accounts, categories, and budgets; reduces repeated Firefly API calls on transaction and meta endpoints (`FIREFLY_REFERENCE_CACHE_TTL_SECONDS` override)
 - **Clear reference cache** — Refresh icon in the global date bar calls `POST /api/cache/clear` and refreshes normalized transactions, categorize meta, and loan meta
 - **Dashboard budget pie chart legend** — Fixed vertical legend listing all slices (top 15 + Other) with budget name and % share; complements exterior labels on larger slices
@@ -19,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **MoM variance date scope** — Spending and Cash Flow variance reports use their own date range; the global date filter no longer applies there
+- **MoM variance controls** — Compare vs Month restores independent Month A / Month B pickers for direct two-month comparison; Trend vs Month uses To month + Range for sequential month-over-month deltas
+- **Table readability** — Shared table component uses zebra row striping and muted sticky headers (including transaction list)
 - **Dashboard budget charts** — Click a pie slice or bar row to drill into Spending Bar scoped to that budget and the dashboard date range; uncategorized budgets route to the categorize queue (same pattern as MoM/Sankey)
 
 ## [1.1.7] - 2026-07-01

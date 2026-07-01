@@ -58,6 +58,7 @@ describe("MomCompareChart", () => {
     expect(yAxis?.type).toBe("category")
     expect(yAxis?.inverse).toBe(true)
     expect(yAxis?.data).toEqual(["Groceries", "Transport"])
+    expect((yAxis?.splitArea as { show?: boolean })?.show).toBe(true)
 
     const xAxis = capturedOption?.xAxis as Record<string, unknown>
     expect(xAxis?.type).toBe("value")

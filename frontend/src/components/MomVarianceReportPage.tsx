@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 import { MomCompareChart } from "@/components/MomCompareChart"
+import { MomVarianceDataTable } from "@/components/MomVarianceDataTable"
 import { MomTrendChart } from "@/components/MomTrendChart"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useDateRange } from "@/context/DateRangeContext"
 import { useNormalizedTransactions } from "@/hooks/useNormalizedTransactions"
 import { buildBarChartData } from "@/lib/barChart"
 import {
@@ -22,22 +22,28 @@ import {
 } from "@/lib/momComparePrefs"
 import {
   aggregateOtherDeltas,
-  buildTrendDeltaSeries,
+  buildTrendChartSeries,
   compareDelta,
   compareToRollingAverage,
   currentCalendarMonth,
   defaultMonthPair,
+  describeVarianceFetchRange,
+  monthPairFromRange,
   rankStacksByAbsDelta,
-  rankTrendStacksByActivity,
-  rollingAverageFetchRange,
+  rankTrendChartStacks,
+  recentSelectableMonths,
   rollingMonthsBefore,
-  sliceTrendWindowMonths,
+  varianceFetchRange,
 } from "@/lib/momVariance"
 import {
   buildCategorizeQueuePath,
   isUncategorizedDisplayName,
 } from "@/lib/manageNav"
 import { readMomTopN, writeMomTopN, type MomTopNFamily } from "@/lib/momTopN"
+import {
+  buildCompareAmountTableData,
+  buildTrendDeltaTableData,
+} from "@/lib/momVarianceTable"
 import { TOP_N_MAX, TOP_N_MIN } from "@/lib/topNConstants"
 import type { OmniRow } from "@/types/NormalizedTransaction"
 
@@ -45,6 +51,15 @@ const OTHER_LABEL = "Other"
 const DRILLDOWN_EMPTY_MESSAGE =
   "No category breakdown for this budget in this date range"
 const CATEGORIES_TOP_N_LABEL = "Categories shown:"
+const COMPARE_TABLE_TITLE = "Monthly amounts"
+const TREND_TABLE_TITLE = "Month-over-month change"
+const CATEGORY_ROW_LABEL = "Category"
+const VARIANCE_SCOPE_NOTE =
+  "This report uses its own date range—the global date filter does not apply here."
+
+function initialMonthPair(): { monthA: string; monthB: string } {
+  return defaultMonthPair(recentSelectableMonths())
+}
 
 export type MomVarianceReportPageProps = {
   filter: (row: OmniRow) => boolean
@@ -66,6 +81,7 @@ export type MomVarianceReportPageProps = {
   topNLabel: string
   monthALabel?: string
   monthBLabel?: string
+  rangeMonthsLabel?: string
   currentMonthLabel?: string
   averageWindowLabel?: string
 }
@@ -160,14 +176,12 @@ export function MomVarianceReportPage({
   topNLabel,
   monthALabel = "Month A",
   monthBLabel = "Month B",
+  rangeMonthsLabel = "Range",
   currentMonthLabel = "Current month",
   averageWindowLabel = "Avg window",
 }: MomVarianceReportPageProps) {
   const navigate = useNavigate()
-  const { committedRange } = useDateRange()
-  const { start: committedStart, end: committedEnd } = committedRange
-  const { isPending, isError, isSuccess, data, refetch } =
-    useNormalizedTransactions(committedStart, committedEnd)
+  const selectableMonths = useMemo(() => recentSelectableMonths(), [])
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("compare")
   const [compareMode, setCompareMode] = useState<MomCompareMode>(() =>
@@ -181,148 +195,159 @@ export function MomVarianceReportPage({
       readMomRollingAverageMethod(momTopNFamily),
     )
   const [topN, setTopN] = useState(() => readMomTopN(momTopNFamily))
-  const [monthA, setMonthA] = useState("")
-  const [monthB, setMonthB] = useState("")
+  const [monthA, setMonthA] = useState(() => initialMonthPair().monthA)
+  const [monthB, setMonthB] = useState(() => initialMonthPair().monthB)
+  const [trendToMonth, setTrendToMonth] = useState(() => currentCalendarMonth())
   const [currentMonth, setCurrentMonth] = useState(() => currentCalendarMonth())
   const [selectedBudget, setSelectedBudget] = useState<string | null>(null)
+
+  const trendFromMonth = useMemo(
+    () => monthPairFromRange(trendToMonth, rollingWindow).monthA,
+    [trendToMonth, rollingWindow],
+  )
+
+  const varianceRange = useMemo(
+    () =>
+      varianceFetchRange(
+        compareMode,
+        activeTab,
+        {
+          currentMonth,
+          rollingWindow,
+          monthA,
+          monthB,
+          trendToMonth,
+        },
+      ),
+    [
+      compareMode,
+      activeTab,
+      currentMonth,
+      rollingWindow,
+      monthA,
+      monthB,
+      trendToMonth,
+    ],
+  )
+
+  const [varianceStart, varianceEnd] = varianceRange ?? ["", ""]
+
+  const varianceRangeLabel =
+    varianceRange != null
+      ? describeVarianceFetchRange(
+          compareMode,
+          activeTab,
+          varianceRange,
+          {
+            currentMonth,
+            rollingWindow,
+            monthA,
+            monthB,
+            trendToMonth,
+          },
+        )
+      : null
+
+  const { isPending, isError, isSuccess, data, refetch } =
+    useNormalizedTransactions(varianceStart, varianceEnd, {
+      enabled: varianceRange != null,
+    })
 
   const handleBudgetSelect = useCallback(
     (name: string) => {
       if (isUncategorizedDisplayName(name)) {
-        navigate(buildCategorizeQueuePath(committedStart, committedEnd))
+        navigate(buildCategorizeQueuePath(varianceStart, varianceEnd))
         return
       }
       setSelectedBudget(name)
     },
-    [navigate, committedStart, committedEnd],
+    [navigate, varianceStart, varianceEnd],
   )
-
-  const [averageStart, averageEnd] = useMemo(
-    () => rollingAverageFetchRange(currentMonth, rollingWindow),
-    [currentMonth, rollingWindow],
-  )
-
-  const {
-    isPending: isAveragePending,
-    isError: isAverageError,
-    isSuccess: isAverageSuccess,
-    data: averageData,
-    refetch: refetchAverage,
-  } = useNormalizedTransactions(averageStart, averageEnd, {
-    enabled: compareMode === "vs-average",
-  })
 
   const allRows = isSuccess ? (data?.data ?? []) : []
   const sliceRows = useMemo(() => allRows.filter(filter), [allRows, filter])
 
-  const averageRows = useMemo(() => {
-    if (compareMode !== "vs-average" || !isAverageSuccess) return []
-    return (averageData?.data ?? []).filter(filter)
-  }, [compareMode, isAverageSuccess, averageData, filter])
-
   const budgetChartData = useMemo(
     () =>
       buildBarChartData(sliceRows, ["month", "budget"], {
-        start: committedStart,
-        end: committedEnd,
+        start: varianceStart,
+        end: varianceEnd,
         useCashFlowLabels,
       }),
-    [sliceRows, committedStart, committedEnd, useCashFlowLabels],
+    [sliceRows, varianceStart, varianceEnd, useCashFlowLabels],
   )
 
-  const compareBudgetChartData = useMemo(() => {
-    if (compareMode === "vs-average") {
-      return buildBarChartData(averageRows, ["month", "budget"], {
-        start: averageStart,
-        end: averageEnd,
-        useCashFlowLabels,
-      })
-    }
-    return budgetChartData
-  }, [
-    compareMode,
-    averageRows,
-    averageStart,
-    averageEnd,
-    useCashFlowLabels,
-    budgetChartData,
-  ])
-
   const months = budgetChartData.months
-  const compareMonths = compareBudgetChartData.months
-  const monthsSelectable = months.length >= 2
+  const compareMonthsSelectable =
+    monthA !== "" &&
+    monthB !== "" &&
+    monthA !== monthB &&
+    months.length >= 2
+  const monthsSelectable =
+    compareMode === "month-pair" && activeTab === "compare"
+      ? compareMonthsSelectable
+      : months.length >= 2
   const averageMonthsSelectable =
     compareMode === "vs-average" &&
     currentMonth !== "" &&
     rollingMonthsBefore(currentMonth, rollingWindow).some((month) =>
-      compareMonths.includes(month),
+      months.includes(month),
     )
 
   useEffect(() => {
-    const pair = defaultMonthPair(months)
-    setMonthA(pair.monthA)
-    setMonthB(pair.monthB)
     setSelectedBudget(null)
-  }, [committedStart, committedEnd, months])
-
-  useEffect(() => {
-    if (compareMode !== "vs-average") return
-    if (compareMonths.length === 0) return
-    if (!compareMonths.includes(currentMonth)) {
-      setCurrentMonth(compareMonths[compareMonths.length - 1]!)
-    }
-  }, [compareMode, compareMonths, currentMonth])
+  }, [compareMode])
 
   const categoryChartData = useMemo(() => {
     if (selectedBudget == null) return null
 
-    if (compareMode === "vs-average" && activeTab === "compare") {
-      return buildBarChartData(averageRows, ["month", "category"], {
-        start: averageStart,
-        end: averageEnd,
-        filter: { budget: selectedBudget },
-        useCashFlowLabels,
-      })
-    }
-
     return buildBarChartData(sliceRows, ["month", "category"], {
-      start: committedStart,
-      end: committedEnd,
+      start: varianceStart,
+      end: varianceEnd,
       filter: { budget: selectedBudget },
       useCashFlowLabels,
     })
   }, [
     selectedBudget,
-    compareMode,
-    activeTab,
-    averageRows,
-    averageStart,
-    averageEnd,
     sliceRows,
-    committedStart,
-    committedEnd,
+    varianceStart,
+    varianceEnd,
     useCashFlowLabels,
   ])
 
+  const trendOptions = useMemo(
+    () => ({
+      rollingWindow,
+      rollingAverageMethod,
+    }),
+    [rollingWindow, rollingAverageMethod],
+  )
+
   const trendChartData = useMemo(() => {
-    const windowMonths = sliceTrendWindowMonths(budgetChartData.months)
-    const { deltaMonths, series: allSeries } = buildTrendDeltaSeries(
+    const { deltaMonths, series: allSeries } = buildTrendChartSeries(
       budgetChartData,
-      windowMonths,
+      compareMode,
+      trendOptions,
     )
-    const { names: topNames } = rankTrendStacksByActivity(
+    const { names: topNames } = rankTrendChartStacks(
       budgetChartData,
-      windowMonths,
+      compareMode,
+      trendOptions,
       topN,
     )
     const series = filterTrendSeriesByTopN(allSeries, topNames)
     return { deltaMonths, series }
-  }, [budgetChartData, topN])
+  }, [budgetChartData, compareMode, trendOptions, topN])
+
+  const trendDisplayMessage =
+    compareMode === "vs-average" && trendChartData.deltaMonths.length === 0
+      ? compareAverageEmptyMessage
+      : emptyMessage
 
   const compareChartData = useMemo(
     () =>
       buildCompareChartData(
-        compareBudgetChartData,
+        budgetChartData,
         compareMode,
         topN,
         monthA,
@@ -333,7 +358,7 @@ export function MomVarianceReportPage({
         monthsSelectable,
       ),
     [
-      compareBudgetChartData,
+      budgetChartData,
       compareMode,
       topN,
       monthA,
@@ -352,19 +377,20 @@ export function MomVarianceReportPage({
         series: [] as { name: string; data: number[] }[],
       }
     }
-    const windowMonths = sliceTrendWindowMonths(categoryChartData.months)
-    const { deltaMonths, series: allSeries } = buildTrendDeltaSeries(
+    const { deltaMonths, series: allSeries } = buildTrendChartSeries(
       categoryChartData,
-      windowMonths,
+      compareMode,
+      trendOptions,
     )
-    const { names: topNames } = rankTrendStacksByActivity(
+    const { names: topNames } = rankTrendChartStacks(
       categoryChartData,
-      windowMonths,
+      compareMode,
+      trendOptions,
       topN,
     )
     const series = filterTrendSeriesByTopN(allSeries, topNames)
     return { deltaMonths, series }
-  }, [categoryChartData, topN])
+  }, [categoryChartData, compareMode, trendOptions, topN])
 
   const categoryCompareChartData = useMemo(() => {
     if (!categoryChartData) {
@@ -394,6 +420,72 @@ export function MomVarianceReportPage({
     monthsSelectable,
   ])
 
+  const compareTableOptions = useMemo(
+    () => ({
+      monthA,
+      monthB,
+      currentMonth,
+      rollingWindow,
+      rollingAverageMethod,
+    }),
+    [monthA, monthB, currentMonth, rollingWindow, rollingAverageMethod],
+  )
+
+  const compareBudgetTableData = useMemo(() => {
+    if (activeTab !== "compare" || selectedBudget != null) return null
+    if (compareChartData.sortedNames.length === 0) return null
+    return buildCompareAmountTableData(
+      budgetChartData,
+      compareChartData.sortedNames,
+      compareMode,
+      compareTableOptions,
+    )
+  }, [
+    activeTab,
+    selectedBudget,
+    compareChartData.sortedNames,
+    budgetChartData,
+    compareMode,
+    compareTableOptions,
+  ])
+
+  const compareCategoryTableData = useMemo(() => {
+    if (selectedBudget == null || activeTab !== "compare" || !categoryChartData) {
+      return null
+    }
+    if (categoryCompareChartData.sortedNames.length === 0) return null
+    return buildCompareAmountTableData(
+      categoryChartData,
+      categoryCompareChartData.sortedNames,
+      compareMode,
+      { ...compareTableOptions, rowLabel: CATEGORY_ROW_LABEL },
+    )
+  }, [
+    selectedBudget,
+    activeTab,
+    categoryChartData,
+    categoryCompareChartData.sortedNames,
+    compareMode,
+    compareTableOptions,
+  ])
+
+  const trendBudgetTableData = useMemo(() => {
+    if (activeTab !== "trend" || selectedBudget != null) return null
+    return buildTrendDeltaTableData(
+      trendChartData.deltaMonths,
+      trendChartData.series,
+    )
+  }, [activeTab, selectedBudget, trendChartData])
+
+  const trendCategoryTableData = useMemo(() => {
+    if (selectedBudget == null || activeTab !== "trend") return null
+    return buildTrendDeltaTableData(
+      categoryTrendChartData.deltaMonths,
+      categoryTrendChartData.series,
+      CATEGORY_ROW_LABEL,
+    )
+  }, [selectedBudget, activeTab, categoryTrendChartData])
+
   const displayTopNLabel =
     selectedBudget != null ? CATEGORIES_TOP_N_LABEL : topNLabel
 
@@ -411,16 +503,21 @@ export function MomVarianceReportPage({
       ? compareAverageChartTitle
       : compareChartTitle
 
-  const compareLoading =
-    isPending || (compareMode === "vs-average" && isAveragePending)
+  const compareLoading = isPending
 
-  const hasFetchError = isError || (compareMode === "vs-average" && isAverageError)
+  const hasFetchError = isError
 
   const controlsDisabled = compareLoading || hasFetchError
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">{pageTitle}</h1>
+        <p className="text-sm text-muted-foreground">
+          {VARIANCE_SCOPE_NOTE}
+          {varianceRangeLabel ? ` ${varianceRangeLabel}.` : ""}
+        </p>
+      </div>
 
       {hasFetchError ? (
         <div
@@ -441,9 +538,6 @@ export function MomVarianceReportPage({
             className="mt-3"
             onClick={() => {
               void refetch()
-              if (compareMode === "vs-average") {
-                void refetchAverage()
-              }
             }}
           >
             Retry
@@ -481,13 +575,11 @@ export function MomVarianceReportPage({
               </Button>
             </div>
 
-            {activeTab === "compare" ? (
-              <>
-                <div
-                  className="inline-flex rounded-md border shadow-xs"
-                  role="group"
-                  aria-label="Compare mode"
-                >
+            <div
+              className="inline-flex rounded-md border shadow-xs"
+              role="group"
+              aria-label="Compare mode"
+            >
                   <Button
                     type="button"
                     variant={
@@ -514,6 +606,9 @@ export function MomVarianceReportPage({
                     onClick={() => {
                       setCompareMode("month-pair")
                       writeMomCompareMode(momTopNFamily, "month-pair")
+                      const pair = defaultMonthPair(selectableMonths)
+                      setMonthA(pair.monthA)
+                      setMonthB(pair.monthB)
                     }}
                   >
                     vs Month
@@ -527,10 +622,10 @@ export function MomVarianceReportPage({
                       <select
                         className="min-w-[140px] rounded-md border border-input bg-background px-2 py-1"
                         value={currentMonth}
-                        disabled={controlsDisabled || compareMonths.length === 0}
+                        disabled={controlsDisabled || selectableMonths.length === 0}
                         onChange={(e) => setCurrentMonth(e.target.value)}
                       >
-                        {compareMonths.map((month) => (
+                        {selectableMonths.map((month) => (
                           <option key={month} value={month}>
                             {month}
                           </option>
@@ -597,17 +692,17 @@ export function MomVarianceReportPage({
                       </Button>
                     </div>
                   </>
-                ) : (
+                ) : activeTab === "compare" ? (
                   <>
                     <label className="flex items-center gap-2 font-medium">
                       {monthALabel}
                       <select
                         className="min-w-[140px] rounded-md border border-input bg-background px-2 py-1"
                         value={monthA}
-                        disabled={controlsDisabled || !monthsSelectable}
+                        disabled={controlsDisabled || selectableMonths.length < 2}
                         onChange={(e) => setMonthA(e.target.value)}
                       >
-                        {months.map((month) => (
+                        {selectableMonths.map((month) => (
                           <option key={month} value={month}>
                             {month}
                           </option>
@@ -619,10 +714,10 @@ export function MomVarianceReportPage({
                       <select
                         className="min-w-[140px] rounded-md border border-input bg-background px-2 py-1"
                         value={monthB}
-                        disabled={controlsDisabled || !monthsSelectable}
+                        disabled={controlsDisabled || selectableMonths.length < 2}
                         onChange={(e) => setMonthB(e.target.value)}
                       >
-                        {months.map((month) => (
+                        {selectableMonths.map((month) => (
                           <option key={month} value={month}>
                             {month}
                           </option>
@@ -630,9 +725,49 @@ export function MomVarianceReportPage({
                       </select>
                     </label>
                   </>
+                ) : (
+                  <>
+                    <label className="flex items-center gap-2 font-medium">
+                      To month
+                      <select
+                        className="min-w-[140px] rounded-md border border-input bg-background px-2 py-1"
+                        value={trendToMonth}
+                        disabled={controlsDisabled || selectableMonths.length === 0}
+                        onChange={(e) => setTrendToMonth(e.target.value)}
+                      >
+                        {selectableMonths.map((month) => (
+                          <option key={month} value={month}>
+                            {month}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2 font-medium">
+                      {rangeMonthsLabel}
+                      <select
+                        className="min-w-[72px] rounded-md border border-input bg-background px-2 py-1"
+                        value={rollingWindow}
+                        disabled={controlsDisabled}
+                        onChange={(e) => {
+                          const next = Number(
+                            e.target.value,
+                          ) as RollingWindowMonths
+                          setRollingWindow(next)
+                          writeMomRollingWindow(momTopNFamily, next)
+                        }}
+                      >
+                        {ROLLING_WINDOW_OPTIONS.map((months) => (
+                          <option key={months} value={months}>
+                            {months} mo
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <span className="text-muted-foreground">
+                      From {trendFromMonth}
+                    </span>
+                  </>
                 )}
-              </>
-            ) : null}
 
             <label className="flex items-center gap-2 font-medium">
               {displayTopNLabel}
@@ -658,27 +793,49 @@ export function MomVarianceReportPage({
           </div>
 
           {activeTab === "trend" ? (
-            <MomTrendChart
-              deltaMonths={trendChartData.deltaMonths}
-              series={trendChartData.series}
-              loading={isPending}
-              emptyMessage={emptyMessage}
-              chartTitle={trendChartTitle}
-              interactionHint={interactionHintTrend}
-              yAxisName={yAxisNameTrend}
-              onSelect={handleBudgetSelect}
-            />
+            <>
+              <MomTrendChart
+                deltaMonths={trendChartData.deltaMonths}
+                series={trendChartData.series}
+                loading={isPending}
+                emptyMessage={trendDisplayMessage}
+                chartTitle={trendChartTitle}
+                interactionHint={interactionHintTrend}
+                yAxisName={yAxisNameTrend}
+                onSelect={handleBudgetSelect}
+              />
+              {isPending || trendBudgetTableData != null ? (
+                <MomVarianceDataTable
+                  tableData={trendBudgetTableData}
+                  loading={isPending}
+                  emptyMessage={trendDisplayMessage}
+                  title={TREND_TABLE_TITLE}
+                  onRowSelect={handleBudgetSelect}
+                />
+              ) : null}
+            </>
           ) : (
-            <MomCompareChart
-              sortedNames={compareChartData.sortedNames}
-              deltas={compareChartData.deltas}
-              loading={compareLoading}
-              emptyMessage={compareDisplayMessage}
-              chartTitle={compareTitle}
-              interactionHint={interactionHintCompare}
-              yAxisName={yAxisNameCompare}
-              onSelect={handleBudgetSelect}
-            />
+            <>
+              <MomCompareChart
+                sortedNames={compareChartData.sortedNames}
+                deltas={compareChartData.deltas}
+                loading={compareLoading}
+                emptyMessage={compareDisplayMessage}
+                chartTitle={compareTitle}
+                interactionHint={interactionHintCompare}
+                yAxisName={yAxisNameCompare}
+                onSelect={handleBudgetSelect}
+              />
+              {compareLoading || compareBudgetTableData != null ? (
+                <MomVarianceDataTable
+                  tableData={compareBudgetTableData}
+                  loading={compareLoading}
+                  emptyMessage={compareDisplayMessage}
+                  title={COMPARE_TABLE_TITLE}
+                  onRowSelect={handleBudgetSelect}
+                />
+              ) : null}
+            </>
           )}
 
           {selectedBudget != null && !compareLoading ? (
@@ -697,27 +854,47 @@ export function MomVarianceReportPage({
                   Clear
                 </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-6">
                 {activeTab === "trend" ? (
-                  <MomTrendChart
-                    embedded
-                    deltaMonths={categoryTrendChartData.deltaMonths}
-                    series={categoryTrendChartData.series}
-                    loading={false}
-                    emptyMessage={DRILLDOWN_EMPTY_MESSAGE}
-                    chartTitle=""
-                    yAxisName={yAxisNameTrend}
-                  />
+                  <>
+                    <MomTrendChart
+                      embedded
+                      deltaMonths={categoryTrendChartData.deltaMonths}
+                      series={categoryTrendChartData.series}
+                      loading={false}
+                      emptyMessage={DRILLDOWN_EMPTY_MESSAGE}
+                      chartTitle=""
+                      yAxisName={yAxisNameTrend}
+                    />
+                    {trendCategoryTableData != null ? (
+                      <MomVarianceDataTable
+                        embedded
+                        tableData={trendCategoryTableData}
+                        emptyMessage={DRILLDOWN_EMPTY_MESSAGE}
+                        title={TREND_TABLE_TITLE}
+                      />
+                    ) : null}
+                  </>
                 ) : (
-                  <MomCompareChart
-                    embedded
-                    sortedNames={categoryCompareChartData.sortedNames}
-                    deltas={categoryCompareChartData.deltas}
-                    loading={false}
-                    emptyMessage={DRILLDOWN_EMPTY_MESSAGE}
-                    chartTitle=""
-                    yAxisName={yAxisNameCompare}
-                  />
+                  <>
+                    <MomCompareChart
+                      embedded
+                      sortedNames={categoryCompareChartData.sortedNames}
+                      deltas={categoryCompareChartData.deltas}
+                      loading={false}
+                      emptyMessage={DRILLDOWN_EMPTY_MESSAGE}
+                      chartTitle=""
+                      yAxisName={yAxisNameCompare}
+                    />
+                    {compareCategoryTableData != null ? (
+                      <MomVarianceDataTable
+                        embedded
+                        tableData={compareCategoryTableData}
+                        emptyMessage={DRILLDOWN_EMPTY_MESSAGE}
+                        title={COMPARE_TABLE_TITLE}
+                      />
+                    ) : null}
+                  </>
                 )}
               </CardContent>
             </Card>

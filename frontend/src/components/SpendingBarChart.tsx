@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { BarChartData } from "@/lib/barChart"
 import { CHART_COLORS } from "@/lib/chartColors"
+import { categoryAxisColumnStripes } from "@/lib/chartStripes"
 import {
   chartGridWithVerticalLegend,
   verticalRightLegend,
@@ -108,6 +109,7 @@ export function SpendingBarChart({
         type: "category",
         data: months,
         axisLabel: { rotate: 30 },
+        ...categoryAxisColumnStripes(),
       },
       yAxis: {
         type: "value",

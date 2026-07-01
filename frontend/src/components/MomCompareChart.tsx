@@ -5,6 +5,7 @@ import type { EChartsOption } from "echarts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency } from "@/lib/spending"
+import { categoryAxisRowStripes } from "@/lib/chartStripes"
 
 const DELTA_INCREASE_COLOR = "#ef4444"
 const DELTA_DECREASE_COLOR = "#22c55e"
@@ -94,6 +95,7 @@ export function MomCompareChart({
         type: "category",
         data: sortedNames,
         inverse: true,
+        ...categoryAxisRowStripes(),
       },
       series: [
         {

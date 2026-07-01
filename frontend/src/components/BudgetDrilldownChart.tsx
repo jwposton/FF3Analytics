@@ -11,6 +11,7 @@ import {
   type StackDimension,
 } from "@/lib/barChart"
 import { CHART_COLORS } from "@/lib/chartColors"
+import { categoryAxisColumnStripes } from "@/lib/chartStripes"
 import {
   chartGridWithVerticalLegend,
   verticalRightLegend,
@@ -122,6 +123,7 @@ export function BudgetDrilldownChart({
           type: "category",
           data: months,
           axisLabel: { rotate: 30 },
+          ...categoryAxisColumnStripes(),
         },
         yAxis: {
           type: "value",
@@ -201,6 +203,7 @@ export function BudgetDrilldownChart({
         type: "category",
         data: months,
         axisLabel: { rotate: 30 },
+        ...categoryAxisColumnStripes(),
       },
       yAxis: {
         type: "value",
