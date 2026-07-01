@@ -5,9 +5,27 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from categorize_queue import build_pending_queue
+from categorize_queue import build_grouped_pending_queue, build_pending_queue
 from firefly_client import FireflyClient
-from transaction_normalization import is_uncategorized_for_queue
+from transaction_normalization import description_fingerprint, is_uncategorized_for_queue
+
+
+class TestDescriptionFingerprint:
+    def test_amazon_variants_same_fingerprint(self):
+        a = description_fingerprint("AMZN MKTP US*AB1CD2EF3")
+        b = description_fingerprint("amzn mktp us*xy9")
+        assert a == b
+        assert a == "amzn mktp us"
+
+    def test_empty_returns_empty(self):
+        assert description_fingerprint("") == ""
+        assert description_fingerprint("   ") == ""
+
+    def test_lowercase(self):
+        assert description_fingerprint("NETFLIX.COM") == "netflix com"
+
+    def test_strips_digits_and_punctuation(self):
+        assert description_fingerprint("STORE #123!!!") == "store"
 
 
 def test_uncategorized_withdrawal_null_category():
@@ -219,3 +237,94 @@ async def test_pending_queue_respects_limit():
     )
     rows = await build_pending_queue(client, "2024-06-01", "2024-06-30", limit=3)
     assert len(rows) == 3
+
+
+GROUPED_SPLITS = [
+    {
+        "journal_id": "201",
+        "transaction_journal_id": "2001",
+        "type": "withdrawal",
+        "amount": "-10.00",
+        "category_name": None,
+        "budget_name": None,
+        "date": "2024-06-20",
+        "description": "AMZN MKTP US*AB1",
+        "source_name": "Checking",
+        "destination_name": "Amazon",
+    },
+    {
+        "journal_id": "202",
+        "transaction_journal_id": "2002",
+        "type": "withdrawal",
+        "amount": "-15.00",
+        "category_name": None,
+        "budget_name": None,
+        "date": "2024-06-19",
+        "description": "amzn mktp us*xy9",
+        "source_name": "Checking",
+        "destination_name": "Amazon",
+    },
+    {
+        "journal_id": "203",
+        "transaction_journal_id": "2003",
+        "type": "withdrawal",
+        "amount": "-20.00",
+        "category_name": None,
+        "budget_name": None,
+        "date": "2024-06-18",
+        "description": "amzn mktp us*zz1",
+        "source_name": "Checking",
+        "destination_name": "Amazon",
+    },
+    {
+        "journal_id": "204",
+        "transaction_journal_id": "2004",
+        "type": "withdrawal",
+        "amount": "-5.00",
+        "category_name": None,
+        "budget_name": None,
+        "date": "2024-06-17",
+        "description": "UNIQUE MERCHANT",
+        "source_name": "Checking",
+        "destination_name": "Store",
+    },
+]
+
+
+@pytest.mark.asyncio
+async def test_grouped_pending_queue_buckets_by_fingerprint():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/accounts"):
+            return httpx.Response(200, json={"data": [], "meta": {"pagination": {"current_page": 1, "total_pages": 1}}})
+        if request.url.path.endswith("/transactions"):
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": s["journal_id"],
+                            "attributes": {
+                                "transactions": [
+                                    {**s, "source_id": "1", "destination_id": "2"}
+                                ]
+                            },
+                        }
+                        for s in GROUPED_SPLITS
+                    ],
+                    "meta": {"pagination": {"current_page": 1, "total_pages": 1}},
+                },
+            )
+        return httpx.Response(404)
+
+    client = FireflyClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://firefly.example",
+        api_token="token",
+    )
+    groups = await build_grouped_pending_queue(client, "2024-06-01", "2024-06-30")
+    assert len(groups) == 2
+    assert groups[0]["count"] == 3
+    assert set(groups[0]["journal_ids"]) == {"201", "202", "203"}
+    assert groups[0]["sample_description"] == "AMZN MKTP US*AB1"
+    assert groups[1]["count"] == 1
+    assert groups[1]["journal_ids"] == ["204"]

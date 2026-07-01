@@ -66,6 +66,108 @@ def test_pending_success(client, firefly_env, monkeypatch):
         app.dependency_overrides.clear()
 
 
+def test_pending_grouped_by_fingerprint(client, firefly_env, monkeypatch):
+    from main import app
+    from routes import categorize as cat_mod
+
+    async def _grouped(*_args, **_kwargs):
+        return [
+            {
+                "fingerprint": "amzn mktp us",
+                "count": 2,
+                "sample_description": "AMZN MKTP",
+                "journal_ids": ["1", "2"],
+                "rows": [
+                    {
+                        "journal_id": "1",
+                        "transaction_journal_id": "10",
+                        "date": "2024-06-02",
+                        "amount": "-5.00",
+                        "description": "AMZN MKTP",
+                        "type": "withdrawal",
+                        "source_name": "Checking",
+                        "destination_name": "Amazon",
+                        "budget_name": None,
+                    },
+                    {
+                        "journal_id": "2",
+                        "transaction_journal_id": "11",
+                        "date": "2024-06-01",
+                        "amount": "-3.00",
+                        "description": "amzn mktp",
+                        "type": "withdrawal",
+                        "source_name": "Checking",
+                        "destination_name": "Amazon",
+                        "budget_name": None,
+                    },
+                ],
+            }
+        ]
+
+    class _StubClient:
+        base_url = "https://firefly.example"
+
+    app.dependency_overrides[cat_mod.get_firefly_client] = lambda: _StubClient()
+    monkeypatch.setattr(
+        cat_mod, "build_grouped_pending_queue", _grouped
+    )
+    try:
+        response = client.get(
+            "/api/categorize/pending",
+            params={
+                "start": "2024-06-01",
+                "end": "2024-06-30",
+                "group_by_fingerprint": "true",
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["meta"]["grouped"] is True
+        assert body["meta"]["group_count"] == 1
+        assert body["data"][0]["fingerprint"] == "amzn mktp us"
+        assert body["data"][0]["journal_ids"] == ["1", "2"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_pending_flat_unchanged_without_group_param(client, firefly_env, monkeypatch):
+    from main import app
+    from routes import categorize as cat_mod
+
+    async def _pending(*_args, **_kwargs):
+        return [
+            {
+                "journal_id": "1",
+                "transaction_journal_id": "10",
+                "date": "2024-06-01",
+                "amount": "-5.00",
+                "description": "TEST",
+                "type": "withdrawal",
+                "source_name": "Checking",
+                "destination_name": "Store",
+                "budget_name": None,
+            }
+        ]
+
+    class _StubClient:
+        base_url = "https://firefly.example"
+
+    app.dependency_overrides[cat_mod.get_firefly_client] = lambda: _StubClient()
+    monkeypatch.setattr(cat_mod, "build_pending_queue", _pending)
+    try:
+        response = client.get(
+            "/api/categorize/pending",
+            params={"start": "2024-06-01", "end": "2024-06-30"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert "grouped" not in body["meta"]
+        assert len(body["data"]) == 1
+        assert "journal_id" in body["data"][0]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_meta_openrouter_flag(client, firefly_env, monkeypatch):
     from main import app
     from routes import categorize as cat_mod

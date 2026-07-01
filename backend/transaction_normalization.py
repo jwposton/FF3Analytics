@@ -2,7 +2,25 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
+
+_DIGIT_RUN = re.compile(r"\d+")
+_PUNCT_RUN = re.compile(r"[^\w\s]+", re.UNICODE)
+_WHITESPACE = re.compile(r"\s+")
+
+
+def description_fingerprint(description: str) -> str:
+    """Normalize merchant description for queue grouping (not rule triggers)."""
+    if not description or not description.strip():
+        return ""
+    text = description.lower()
+    if "*" in text:
+        text = text.split("*", 1)[0]
+    text = _DIGIT_RUN.sub(" ", text)
+    text = _PUNCT_RUN.sub(" ", text)
+    text = _WHITESPACE.sub(" ", text).strip()
+    return text
 
 OMNI_KEYS = (
     "amount",

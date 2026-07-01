@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from categorize_queue import build_pending_queue
+from categorize_queue import build_grouped_pending_queue, build_pending_queue
 from categorization_apply import apply_category, validate_apply_ids
 from categorization_suggest import suggest_batch
 from firefly_client import FireflyClient
@@ -47,16 +47,35 @@ async def get_categorize_pending(
     start: str = Query(..., description="Start date YYYY-MM-DD"),
     end: str = Query(..., description="End date YYYY-MM-DD"),
     limit: int = Query(50, ge=1, le=100),
+    group_by_fingerprint: bool = Query(False),
     client: FireflyClient = Depends(get_firefly_client),
 ):
     _parse_date_range(start, end)
     try:
-        data = await build_pending_queue(client, start, end, limit=limit)
+        if group_by_fingerprint:
+            groups = await build_grouped_pending_queue(
+                client, start, end, limit=limit
+            )
+        else:
+            data = await build_pending_queue(client, start, end, limit=limit)
     except Exception as exc:
         raise HTTPException(
             status_code=502,
             detail=f"Failed to fetch Firefly III transactions: {exc}",
         ) from exc
+    if group_by_fingerprint:
+        row_count = sum(g["count"] for g in groups)
+        return {
+            "data": groups,
+            "meta": {
+                "count": row_count,
+                "group_count": len(groups),
+                "grouped": True,
+                "start": start,
+                "end": end,
+                "limit": limit,
+            },
+        }
     return {
         "data": data,
         "meta": {"count": len(data), "start": start, "end": end, "limit": limit},
