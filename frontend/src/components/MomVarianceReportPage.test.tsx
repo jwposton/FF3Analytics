@@ -195,9 +195,11 @@ describe("MomVarianceReportPage", () => {
   afterEach(() => {
     cleanup()
     localStorage.clear()
+    vi.useRealTimers()
   })
 
   beforeEach(() => {
+    vi.setSystemTime(new Date(2024, 2, 15))
     mockUseDateRange.mockReturnValue({
       committedRange: { start: "2024-01-01", end: "2024-03-31" },
     })
@@ -240,7 +242,7 @@ describe("MomVarianceReportPage", () => {
     expect(screen.queryByText("Month B")).toBeNull()
   })
 
-  it("shows month pair selectors when vs Month mode selected", () => {
+  it("shows month pair selectors when vs Month mode selected on Compare tab", () => {
     render(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
 
     fireEvent.click(screen.getByRole("button", { name: "vs Month" }))
@@ -248,9 +250,10 @@ describe("MomVarianceReportPage", () => {
     expect(screen.getByText("Month A")).toBeTruthy()
     expect(screen.getByText("Month B")).toBeTruthy()
     expect(screen.queryByText("Current month")).toBeNull()
+    expect(screen.queryByText("Range")).toBeNull()
   })
 
-  it("applies defaultMonthPair in vs Month mode", () => {
+  it("applies defaultMonthPair in vs Month compare mode", () => {
     render(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
 
     fireEvent.click(screen.getByRole("button", { name: "vs Month" }))
@@ -258,6 +261,17 @@ describe("MomVarianceReportPage", () => {
     const selects = screen.getAllByRole("combobox")
     expect((selects[0] as HTMLSelectElement).value).toBe("2024-02")
     expect((selects[1] as HTMLSelectElement).value).toBe("2024-03")
+  })
+
+  it("shows trend range controls on Trend tab in vs Month mode", () => {
+    render(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
+
+    fireEvent.click(screen.getByRole("button", { name: "vs Month" }))
+    fireEvent.click(screen.getByRole("button", { name: "Trend" }))
+
+    expect(screen.getByText("Range")).toBeTruthy()
+    expect(screen.getByText(/From 2023-10/)).toBeTruthy()
+    expect(screen.queryByText("Month A")).toBeNull()
   })
 
   it("shows error banner when fetch fails", () => {
@@ -284,20 +298,41 @@ describe("MomVarianceReportPage", () => {
     expect(slider.getAttribute("max")).toBe("25")
   })
 
-  it("shows compare empty copy when range has fewer than two months in vs Month mode", () => {
-    mockUseDateRange.mockReturnValue({
-      committedRange: { start: "2024-03-01", end: "2024-03-31" },
-    })
-
+  it("shows variance scope note instead of relying on global date filter", () => {
     render(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
+
+    expect(
+      screen.getByText(/global date filter does not apply/i),
+    ).toBeTruthy()
+  })
+
+  it("shows compare empty copy when no transactions match filter in vs Month mode", () => {
+    mockUseNormalizedTransactions.mockImplementation(() => ({
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+      data: {
+        data: [
+          {
+            ...mainCheckingWithdrawal,
+            date: "2024-03-15",
+            amount: "10.00",
+          },
+        ],
+      },
+      refetch: vi.fn(),
+    }))
+
+    render(
+      <MomVarianceReportPage filter={() => false} {...pageProps} />,
+    )
 
     fireEvent.click(screen.getByRole("button", { name: "vs Month" }))
 
     expect(
-      screen.getByText(
-        "Select a range spanning at least two months to compare months",
-      ),
-    ).toBeTruthy()
+      screen.getByTestId("mom-compare-empty").textContent,
+    ).toContain("No spending in this date range")
+    expect(screen.queryByTestId("mom-variance-table")).toBeNull()
   })
 
   describe("drilldown", () => {
@@ -323,7 +358,7 @@ describe("MomVarianceReportPage", () => {
       fireEvent.click(screen.getByTestId("trend-uncategorized-trigger"))
 
       expect(mockNavigate).toHaveBeenCalledWith(
-        "/manage/categorize?start=2024-01-01&end=2024-03-31",
+        "/manage/categorize?start=2023-09-01&end=2024-03-15",
       )
       expect(screen.queryByText("Uncategorized breakdown")).toBeNull()
     })
@@ -392,24 +427,19 @@ describe("MomVarianceReportPage", () => {
       expect(screen.getByTestId("mom-compare-chart-embedded")).toBeTruthy()
     })
 
-    it("clears drill when committed date range changes", () => {
-      const { rerender } = render(
-        <MomVarianceReportPage filter={alwaysTrue} {...pageProps} />,
-      )
+    it("clears drill when compare mode changes", () => {
+      render(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
 
       fireEvent.click(screen.getByRole("button", { name: "Trend" }))
       fireEvent.click(screen.getByTestId("trend-drill-trigger"))
       expect(screen.getByText("Groceries breakdown")).toBeTruthy()
 
-      mockUseDateRange.mockReturnValue({
-        committedRange: { start: "2024-04-01", end: "2024-06-30" },
-      })
-      rerender(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
+      fireEvent.click(screen.getByRole("button", { name: "vs Month" }))
 
       expect(screen.queryByText("Groceries breakdown")).toBeNull()
     })
 
-    it("keeps drill when month A/B changes on Compare tab in vs Month mode", () => {
+    it("keeps drill when month pair changes on Compare tab in vs Month mode", () => {
       render(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
 
       fireEvent.click(screen.getByRole("button", { name: "vs Month" }))
@@ -420,6 +450,44 @@ describe("MomVarianceReportPage", () => {
       fireEvent.change(selects[0]!, { target: { value: "2024-01" } })
 
       expect(screen.getByText("Groceries breakdown")).toBeTruthy()
+    })
+  })
+
+  describe("data table", () => {
+    beforeEach(() => {
+      mockUseNormalizedTransactions.mockImplementation(() => ({
+        isPending: false,
+        isError: false,
+        isSuccess: true,
+        data: { data: groceriesRows },
+        refetch: vi.fn(),
+      }))
+    })
+
+    it("shows compare budget table beneath the chart", () => {
+      render(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
+
+      expect(screen.getByTestId("mom-variance-table")).toBeTruthy()
+      expect(screen.getByText("Monthly amounts")).toBeTruthy()
+      expect(screen.getAllByText("Groceries").length).toBeGreaterThan(0)
+    })
+
+    it("shows trend delta table when Trend tab is selected", () => {
+      render(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
+
+      fireEvent.click(screen.getByRole("button", { name: "Trend" }))
+
+      expect(screen.getByTestId("mom-variance-table")).toBeTruthy()
+      expect(screen.getByText("Month-over-month change")).toBeTruthy()
+    })
+
+    it("shows category table in drilldown card", () => {
+      render(<MomVarianceReportPage filter={alwaysTrue} {...pageProps} />)
+
+      fireEvent.click(screen.getByTestId("compare-drill-trigger"))
+
+      expect(screen.getByTestId("mom-variance-table-embedded")).toBeTruthy()
+      expect(screen.getByText("Food")).toBeTruthy()
     })
   })
 })

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { TrendChartType } from "@/lib/trendsChartType"
 import { CHART_COLORS } from "@/lib/chartColors"
+import { categoryAxisColumnStripes } from "@/lib/chartStripes"
 import { formatCurrency } from "@/lib/spending"
 
 export type TrendLineSeries = {
@@ -109,6 +110,7 @@ export function SpendingTrendsChart({
           type: "category",
           data: months,
           axisLabel: { rotate: 30 },
+          ...categoryAxisColumnStripes(),
         },
         yAxis: {
           type: "value",
@@ -163,6 +165,7 @@ export function SpendingTrendsChart({
         type: "category",
         data: months,
         axisLabel: { rotate: 30 },
+        ...categoryAxisColumnStripes(),
       },
       yAxis: {
         type: "value",

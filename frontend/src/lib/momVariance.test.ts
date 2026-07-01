@@ -7,11 +7,16 @@ import {
   aggregateOtherDeltas,
   addMonths,
   buildTrendDeltaSeries,
+  buildTrendChartSeries,
+  buildTrendVsAverageSeries,
   compareDelta,
   compareToRollingAverage,
   currentVsRollingBaseline,
   defaultMonthPair,
   medianOf,
+  monthPairFromRange,
+  monthSpanMonths,
+  comparePairTableMonths,
   rankStacksByAbsDelta,
   rankStacksByAmount,
   rankTrendStacksByActivity,
@@ -19,6 +24,7 @@ import {
   rollingMonthsBefore,
   sliceTrendWindowMonths,
   trendDeltaMonths,
+  varianceFetchRange,
 } from "@/lib/momVariance"
 
 function makeChartData(
@@ -88,7 +94,7 @@ describe("compareDelta", () => {
 })
 
 describe("sliceTrendWindowMonths", () => {
-  it("returns last 6 months when input has 8", () => {
+  it("returns all months by default", () => {
     const months = [
       "2024-01",
       "2024-02",
@@ -99,7 +105,21 @@ describe("sliceTrendWindowMonths", () => {
       "2024-07",
       "2024-08",
     ]
-    expect(sliceTrendWindowMonths(months)).toEqual([
+    expect(sliceTrendWindowMonths(months)).toEqual(months)
+  })
+
+  it("returns last N months when maxMonths is set", () => {
+    const months = [
+      "2024-01",
+      "2024-02",
+      "2024-03",
+      "2024-04",
+      "2024-05",
+      "2024-06",
+      "2024-07",
+      "2024-08",
+    ]
+    expect(sliceTrendWindowMonths(months, 6)).toEqual([
       "2024-03",
       "2024-04",
       "2024-05",
@@ -109,9 +129,9 @@ describe("sliceTrendWindowMonths", () => {
     ])
   })
 
-  it("returns all months when input has fewer than 6", () => {
+  it("returns all months when input fits within maxMonths", () => {
     const months = ["2024-01", "2024-02", "2024-03", "2024-04"]
-    expect(sliceTrendWindowMonths(months)).toEqual(months)
+    expect(sliceTrendWindowMonths(months, 6)).toEqual(months)
   })
 })
 
@@ -137,6 +157,25 @@ describe("defaultMonthPair", () => {
       monthA: "",
       monthB: "2024-03",
     })
+  })
+})
+
+describe("monthPairFromRange", () => {
+  it("sets from month N-1 months before to month", () => {
+    expect(monthPairFromRange("2024-03", 6)).toEqual({
+      monthA: "2023-10",
+      monthB: "2024-03",
+    })
+  })
+})
+
+describe("monthSpanMonths", () => {
+  it("enumerates inclusive months regardless of argument order", () => {
+    expect(monthSpanMonths("2024-03", "2024-01")).toEqual([
+      "2024-01",
+      "2024-02",
+      "2024-03",
+    ])
   })
 })
 
@@ -198,6 +237,55 @@ describe("buildTrendDeltaSeries", () => {
     expect(series).toEqual([
       { name: "Groceries", data: [20, -30] },
     ])
+  })
+})
+
+describe("buildTrendVsAverageSeries", () => {
+  it("compares each month to the rolling mean of prior window months", () => {
+    const chart = makeChartData(
+      ["2024-01", "2024-02", "2024-03"],
+      ["Groceries"],
+      {
+        "2024-01": { Groceries: 100 },
+        "2024-02": { Groceries: 120 },
+        "2024-03": { Groceries: 90 },
+      },
+    )
+
+    const { deltaMonths, series } = buildTrendVsAverageSeries(chart, 2, "mean")
+
+    expect(deltaMonths).toEqual(["2024-02", "2024-03"])
+    expect(series).toEqual([
+      { name: "Groceries", data: [20, -20] },
+    ])
+  })
+})
+
+describe("buildTrendChartSeries", () => {
+  const chart = makeChartData(
+    ["2024-01", "2024-02", "2024-03"],
+    ["Groceries"],
+    {
+      "2024-01": { Groceries: 100 },
+      "2024-02": { Groceries: 120 },
+      "2024-03": { Groceries: 90 },
+    },
+  )
+
+  it("uses month-over-month deltas in vs-month mode", () => {
+    const { series } = buildTrendChartSeries(chart, "month-pair", {
+      rollingWindow: 6,
+      rollingAverageMethod: "mean",
+    })
+    expect(series[0]?.data).toEqual([20, -30])
+  })
+
+  it("uses rolling-average deltas in vs-average mode", () => {
+    const { series } = buildTrendChartSeries(chart, "vs-average", {
+      rollingWindow: 2,
+      rollingAverageMethod: "mean",
+    })
+    expect(series[0]?.data).toEqual([20, -20])
   })
 })
 
@@ -275,6 +363,70 @@ describe("rollingAverageFetchRange", () => {
     expect(rollingAverageFetchRange("2024-06", 6, now)).toEqual([
       "2023-12-01",
       "2024-06-15",
+    ])
+  })
+})
+
+describe("varianceFetchRange", () => {
+  const now = new Date(2024, 5, 15)
+
+  it("uses rolling average span for vs-average mode", () => {
+    expect(
+      varianceFetchRange(
+        "vs-average",
+        "compare",
+        {
+          currentMonth: "2024-06",
+          rollingWindow: 6,
+          monthA: "",
+          monthB: "",
+          trendToMonth: "2024-06",
+        },
+        now,
+      ),
+    ).toEqual(["2023-12-01", "2024-06-15"])
+  })
+
+  it("uses ordered month pair span for compare vs-month mode", () => {
+    expect(
+      varianceFetchRange(
+        "month-pair",
+        "compare",
+        {
+          currentMonth: "2024-06",
+          rollingWindow: 6,
+          monthA: "2024-02",
+          monthB: "2024-01",
+          trendToMonth: "2024-06",
+        },
+        now,
+      ),
+    ).toEqual(["2024-01-01", "2024-02-29"])
+  })
+
+  it("uses rolling trend window for trend vs-month mode", () => {
+    expect(
+      varianceFetchRange(
+        "month-pair",
+        "trend",
+        {
+          currentMonth: "2024-06",
+          rollingWindow: 6,
+          monthA: "2024-02",
+          monthB: "2024-03",
+          trendToMonth: "2024-06",
+        },
+        now,
+      ),
+    ).toEqual(["2024-01-01", "2024-06-30"])
+  })
+})
+
+describe("comparePairTableMonths", () => {
+  it("returns the two selected months in chronological order", () => {
+    expect(comparePairTableMonths("2024-03", "2024-01")).toEqual([
+      "2024-01",
+      "2024-03",
     ])
   })
 })

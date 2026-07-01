@@ -1,9 +1,11 @@
 import type { BarChartData } from "@/lib/barChart"
 import type { DateRange } from "@/lib/dateRange"
 import type {
+  MomCompareMode,
   RollingAverageMethod,
   RollingWindowMonths,
 } from "@/lib/momComparePrefs"
+import { enumerateMonths } from "@/lib/trends"
 
 const OTHER_LABEL = "Other"
 
@@ -57,6 +59,109 @@ export function rollingAverageFetchRange(
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
   const end = monthEnd <= today ? monthEnd : today
   return [start, end]
+}
+
+export const VARIANCE_MONTH_PICKER_LOOKBACK = 24
+
+export function recentSelectableMonths(
+  now: Date = new Date(),
+  lookbackMonths = VARIANCE_MONTH_PICKER_LOOKBACK,
+): string[] {
+  const endMonth = currentCalendarMonth(now)
+  const startMonth = addMonths(endMonth, -(lookbackMonths - 1))
+  return enumerateMonths(`${startMonth}-01`, lastDayOfMonth(endMonth))
+}
+
+export function monthPairFetchRange(monthA: string, monthB: string): DateRange | null {
+  if (!monthA || !monthB) return null
+  const first = monthA <= monthB ? monthA : monthB
+  const last = monthA <= monthB ? monthB : monthA
+  return [`${first}-01`, lastDayOfMonth(last)]
+}
+
+export function monthSpanMonths(monthA: string, monthB: string): string[] {
+  const range = monthPairFetchRange(monthA, monthB)
+  if (!range) return []
+  return enumerateMonths(range[0], range[1])
+}
+
+export function monthPairFromRange(
+  toMonth: string,
+  spanMonths: RollingWindowMonths,
+): { monthA: string; monthB: string } {
+  return {
+    monthA: addMonths(toMonth, -(spanMonths - 1)),
+    monthB: toMonth,
+  }
+}
+
+export function comparePairTableMonths(monthA: string, monthB: string): string[] {
+  if (!monthA || !monthB) return []
+  return monthA <= monthB ? [monthA, monthB] : [monthB, monthA]
+}
+
+export function varianceFetchRange(
+  compareMode: MomCompareMode,
+  activeTab: "trend" | "compare",
+  options: {
+    currentMonth: string
+    rollingWindow: RollingWindowMonths
+    monthA: string
+    monthB: string
+    trendToMonth: string
+  },
+  now: Date = new Date(),
+): DateRange | null {
+  if (compareMode === "vs-average") {
+    if (!options.currentMonth) return null
+    return rollingAverageFetchRange(
+      options.currentMonth,
+      options.rollingWindow,
+      now,
+    )
+  }
+  if (activeTab === "compare") {
+    return monthPairFetchRange(options.monthA, options.monthB)
+  }
+  if (!options.trendToMonth) return null
+  const trendPair = monthPairFromRange(
+    options.trendToMonth,
+    options.rollingWindow,
+  )
+  return monthPairFetchRange(trendPair.monthA, trendPair.monthB)
+}
+
+export function describeVarianceFetchRange(
+  compareMode: MomCompareMode,
+  activeTab: "trend" | "compare",
+  range: DateRange,
+  options: {
+    currentMonth: string
+    rollingWindow: RollingWindowMonths
+    monthA: string
+    monthB: string
+    trendToMonth: string
+  },
+): string {
+  if (compareMode === "vs-average") {
+    return `${options.rollingWindow}-month window ending ${options.currentMonth} (${range[0]} – ${range[1]})`
+  }
+  if (activeTab === "compare") {
+    if (!options.monthA || !options.monthB) {
+      return `${range[0]} – ${range[1]}`
+    }
+    const fromMonth =
+      options.monthA <= options.monthB ? options.monthA : options.monthB
+    const toMonth =
+      options.monthA <= options.monthB ? options.monthB : options.monthA
+    return `Month pair ${fromMonth} vs ${toMonth} (${range[0]} – ${range[1]})`
+  }
+  const trendPair = monthPairFromRange(
+    options.trendToMonth,
+    options.rollingWindow,
+  )
+  const spanMonths = monthSpanMonths(trendPair.monthA, trendPair.monthB)
+  return `${spanMonths.length}-month trend ${trendPair.monthA} through ${trendPair.monthB} (${range[0]} – ${range[1]})`
 }
 
 export function medianOf(values: number[]): number {
@@ -169,9 +274,9 @@ export function compareDelta(
 
 export function sliceTrendWindowMonths(
   months: string[],
-  maxMonths = 6,
+  maxMonths: number = 0,
 ): string[] {
-  if (months.length <= maxMonths) return months
+  if (maxMonths <= 0 || months.length <= maxMonths) return months
   return months.slice(-maxMonths)
 }
 
@@ -323,6 +428,66 @@ export function buildTrendDeltaSeries(
   return { deltaMonths, series }
 }
 
+export function buildTrendVsAverageSeries(
+  chartData: BarChartData,
+  windowMonths: RollingWindowMonths,
+  method: RollingAverageMethod = "mean",
+): {
+  deltaMonths: string[]
+  series: { name: string; data: number[] }[]
+} {
+  const trendMonths = chartData.months.filter(
+    (month) =>
+      baselineMonthsInChart(chartData, month, windowMonths).length > 0,
+  )
+
+  const series = chartData.stacks.map((stack) => ({
+    name: stack,
+    data: trendMonths.map((month) => {
+      const baselineMonths = baselineMonthsInChart(
+        chartData,
+        month,
+        windowMonths,
+      )
+      const current = chartData.data[month]?.[stack] ?? 0
+      const baseline = rollingBaselineAmount(
+        chartData,
+        stack,
+        baselineMonths,
+        method,
+      )
+      return current - baseline
+    }),
+  }))
+
+  return { deltaMonths: trendMonths, series }
+}
+
+export function buildTrendChartSeries(
+  chartData: BarChartData,
+  compareMode: MomCompareMode,
+  options: {
+    rollingWindow: RollingWindowMonths
+    rollingAverageMethod: RollingAverageMethod
+  },
+): {
+  deltaMonths: string[]
+  series: { name: string; data: number[] }[]
+} {
+  if (compareMode === "vs-average") {
+    return buildTrendVsAverageSeries(
+      chartData,
+      options.rollingWindow,
+      options.rollingAverageMethod,
+    )
+  }
+  const spanMonths = monthSpanMonths(
+    chartData.months[0] ?? "",
+    chartData.months[chartData.months.length - 1] ?? "",
+  )
+  return buildTrendDeltaSeries(chartData, spanMonths.length > 0 ? spanMonths : chartData.months)
+}
+
 export function rankTrendStacksByActivity(
   chartData: BarChartData,
   windowMonths: string[],
@@ -344,4 +509,49 @@ export function rankTrendStacksByActivity(
   }
 
   return rankStacksByAbsDelta(activity, topN)
+}
+
+export function rankTrendStacksByVsAverageActivity(
+  chartData: BarChartData,
+  windowMonths: RollingWindowMonths,
+  method: RollingAverageMethod,
+  topN: number,
+): { names: string[]; includesOther: boolean } {
+  const { series } = buildTrendVsAverageSeries(chartData, windowMonths, method)
+  const activity = new Map<string, number>()
+  for (const entry of series) {
+    activity.set(
+      entry.name,
+      entry.data.reduce((sum, value) => sum + Math.abs(value), 0),
+    )
+  }
+  return rankStacksByAbsDelta(activity, topN)
+}
+
+export function rankTrendChartStacks(
+  chartData: BarChartData,
+  compareMode: MomCompareMode,
+  options: {
+    rollingWindow: RollingWindowMonths
+    rollingAverageMethod: RollingAverageMethod
+  },
+  topN: number,
+): { names: string[]; includesOther: boolean } {
+  if (compareMode === "vs-average") {
+    return rankTrendStacksByVsAverageActivity(
+      chartData,
+      options.rollingWindow,
+      options.rollingAverageMethod,
+      topN,
+    )
+  }
+  const spanMonths = monthSpanMonths(
+    chartData.months[0] ?? "",
+    chartData.months[chartData.months.length - 1] ?? "",
+  )
+  return rankTrendStacksByActivity(
+    chartData,
+    spanMonths.length > 0 ? spanMonths : chartData.months,
+    topN,
+  )
 }

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { compareChartHeight } from "@/components/MomCompareChart"
 import type { CurrentVsBaseline } from "@/lib/momVariance"
+import { categoryAxisRowStripes } from "@/lib/chartStripes"
 import { formatCurrency } from "@/lib/spending"
 
 const CURRENT_COLOR = "#60A5FA"
@@ -87,6 +88,7 @@ export function BudgetCurrentVsAverageChart({
         type: "category",
         data: sortedNames,
         inverse: true,
+        ...categoryAxisRowStripes(),
       },
       series: [
         {
