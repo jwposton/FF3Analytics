@@ -7,10 +7,14 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from decimal import Decimal
+
 from firefly_client import FireflyClient
+from loan_matcher import amount_outside_tolerance
 from loan_profile_validate import validate_profile
 from loan_profiles import parse_loan_profile_from_notes, write_loan_profile
-from loan_splits_queue import build_pending_loan_splits
+from loan_splits import apply_loan_split, apply_penny_adjust_to_amounts
+from loan_splits_queue import build_pending_loan_splits, find_pending_match
 
 router = APIRouter()
 
@@ -173,3 +177,100 @@ async def get_loan_splits_pending(
             detail=f"Failed to build loan splits queue: {exc}",
         ) from exc
     return {"data": data, "meta": meta}
+
+
+class LoanSplitAmounts(BaseModel):
+    principal: str | None = None
+    interest: str | None = None
+    escrow: str | None = None
+
+
+class LoanSplitApplyRequest(BaseModel):
+    transaction_journal_id: str
+    principal: str
+    interest: str
+    escrow: str = "0.00"
+    start: str
+    end: str
+
+
+def _validate_amount_sum(
+    flat_split: dict[str, Any], amounts: dict[str, str]
+) -> dict[str, Decimal]:
+    payment = abs(Decimal(str(flat_split.get("amount") or "0")))
+    adjusted = apply_penny_adjust_to_amounts(amounts, payment)
+    total = sum(adjusted.values())
+    if abs(total - payment) > Decimal("0.01"):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Component amounts must sum to payment ({payment:.2f}).",
+        )
+    return adjusted
+
+
+@router.post("/loan-splits/{group_id}/preview")
+async def post_loan_split_preview(
+    group_id: str,
+    body: LoanSplitAmounts,
+    start: str = Query(...),
+    end: str = Query(...),
+    client: FireflyClient = Depends(get_firefly_client),
+):
+    _parse_date_range(start, end)
+    try:
+        match = await find_pending_match(client, group_id, start, end)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if match is None:
+        raise HTTPException(status_code=404, detail="Pending loan split not found.")
+    _item, profile, flat_split = match
+    base = _item.get("preview") or {}
+    merged = {
+        "principal": body.principal or base.get("principal"),
+        "interest": body.interest or base.get("interest"),
+        "escrow": body.escrow or base.get("escrow") or "0.00",
+    }
+    adjusted = _validate_amount_sum(flat_split, merged)
+    return {
+        "amounts": {k: f"{v:.2f}" for k, v in adjusted.items()},
+        "warnings": [w for w in [amount_outside_tolerance(flat_split, profile)] if w],
+    }
+
+
+@router.post("/loan-splits/{group_id}/apply")
+async def post_loan_split_apply(
+    group_id: str,
+    body: LoanSplitApplyRequest,
+    client: FireflyClient = Depends(get_firefly_client),
+):
+    _parse_date_range(body.start, body.end)
+    try:
+        match = await find_pending_match(client, group_id, body.start, body.end)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if match is None:
+        raise HTTPException(status_code=404, detail="Pending loan split not found.")
+    _item, profile, flat_split = match
+    if str(flat_split.get("transaction_journal_id")) != str(body.transaction_journal_id):
+        raise HTTPException(
+            status_code=422, detail="transaction_journal_id does not match pending split."
+        )
+    amounts = {
+        "principal": body.principal,
+        "interest": body.interest,
+        "escrow": body.escrow,
+    }
+    adjusted = _validate_amount_sum(flat_split, amounts)
+    str_amounts = {k: f"{v:.2f}" for k, v in adjusted.items()}
+    try:
+        result = await apply_loan_split(
+            client,
+            group_id,
+            body.transaction_journal_id,
+            profile,
+            flat_split,
+            str_amounts,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"ok": True, "journal_id": result.get("id") or group_id}

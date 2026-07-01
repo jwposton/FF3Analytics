@@ -127,3 +127,25 @@ async def build_pending_loan_splits(
         "forward_only_since": since,
     }
     return pending, meta
+
+
+async def find_pending_match(
+    client: FireflyClient,
+    group_id: str,
+    start: str,
+    end: str,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]] | None:
+    """Return (pending_item, profile, flat_split) for group_id if still pending."""
+    pending, _ = await build_pending_loan_splits(client, start, end)
+    for item in pending:
+        if str(item.get("journal_id")) == str(group_id):
+            flat = await client.fetch_splits(start, end)
+            flat = _annotate_split_counts(flat)
+            profiles = await load_enabled_loan_profiles(client)
+            for row in flat:
+                if str(row.get("journal_id")) != str(group_id):
+                    continue
+                profile = find_matching_profile(row, profiles)
+                if profile is not None:
+                    return item, profile, row
+    return None

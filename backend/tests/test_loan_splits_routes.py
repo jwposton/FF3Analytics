@@ -153,3 +153,78 @@ def test_pending_excludes_before_since_date(client, firefly_env, monkeypatch, kw
         assert preview["interest"] == "270.83"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_preview_no_put(client, firefly_env, monkeypatch):
+    app = _handler_factory(monkeypatch)
+    put_count = 0
+
+    from firefly_client import FireflyClient
+    from routes import loans as loans_mod
+
+    original = app.dependency_overrides.get(loans_mod.get_firefly_client)
+    client_inst = original()
+
+    class _CountingClient(FireflyClient):
+        async def update_transaction(self, *args, **kwargs):
+            nonlocal put_count
+            put_count += 1
+            return await super().update_transaction(*args, **kwargs)
+
+    counting = _CountingClient(
+        transport=client_inst._transport,
+        base_url=client_inst.base_url,
+        api_token=client_inst.api_token,
+    )
+    app.dependency_overrides[loans_mod.get_firefly_client] = lambda: counting
+    try:
+        response = client.post(
+            "/api/loan-splits/100/preview",
+            params={"start": "2026-06-01", "end": "2026-07-31"},
+            json={"principal": "156.35"},
+        )
+        assert response.status_code == 200
+        assert put_count == 0
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_apply_triggers_single_put(client, firefly_env, monkeypatch):
+    app = _handler_factory(monkeypatch)
+    put_count = 0
+
+    from firefly_client import FireflyClient
+    from routes import loans as loans_mod
+
+    original = app.dependency_overrides.get(loans_mod.get_firefly_client)
+    client_inst = original()
+
+    class _CountingClient(FireflyClient):
+        async def update_transaction(self, *args, **kwargs):
+            nonlocal put_count
+            put_count += 1
+            return {"id": "100", "attributes": {}}
+
+    counting = _CountingClient(
+        transport=client_inst._transport,
+        base_url=client_inst.base_url,
+        api_token=client_inst.api_token,
+    )
+    app.dependency_overrides[loans_mod.get_firefly_client] = lambda: counting
+    try:
+        response = client.post(
+            "/api/loan-splits/100/apply",
+            json={
+                "transaction_journal_id": "1001",
+                "principal": "156.35",
+                "interest": "270.83",
+                "escrow": "0.00",
+                "start": "2026-06-01",
+                "end": "2026-07-31",
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["ok"] is True
+        assert put_count == 1
+    finally:
+        app.dependency_overrides.clear()
