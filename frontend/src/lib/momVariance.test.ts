@@ -303,7 +303,7 @@ describe("compareToRollingAverage", () => {
         "2024-05": { Fines: 250 },
       },
     )
-    const deltas = compareToRollingAverage(chart, "2024-05", 4, "median")
+    const deltas = compareToRollingAverage(chart, "2024-05", 3, "median")
     expect(deltas.get("Fines")).toBe(250)
   })
 
