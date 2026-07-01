@@ -20,6 +20,7 @@ import {
   triggerRule,
   type PendingGroup,
   type PendingRow,
+  type RuleDraft,
   type RulePreviewCounts,
   type SuggestionPayload,
 } from "@/lib/categorizeApi"
