@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ff3analytics-backend
+    image: ghcr.io/${GITHUB_OWNER:-jwposton}/ff3analytics-backend:${FF3ANALYTICS_TAG:-latest}
     container_name: ff3analytics-backend
     build: ./backend
     restart: unless-stopped
@@ -15,7 +15,7 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
 
   frontend:
-    image: ff3analytics-frontend
+    image: ghcr.io/${GITHUB_OWNER:-jwposton}/ff3analytics-frontend:${FF3ANALYTICS_TAG:-latest}
     container_name: ff3analytics-frontend
     build: ./frontend
     restart: unless-stopped
