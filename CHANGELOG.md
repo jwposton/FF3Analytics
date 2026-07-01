@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-07-01
-
 Firefly write automations: AI categorization and loan payment splits, with a Manage section in the sidebar.
 
 ### Added
@@ -82,8 +80,7 @@ First stable release: self-hosted Firefly III analytics with production Docker d
 
 - Firefly API token stays server-side only; CORS restricted to configured origins
 
-[Unreleased]: https://github.com/jwposton/FF3Analytics/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/jwposton/FF3Analytics/compare/v1.0.2...v1.1.0
+[Unreleased]: https://github.com/jwposton/FF3Analytics/compare/v1.0.2...HEAD
 [1.0.2]: https://github.com/jwposton/FF3Analytics/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/jwposton/FF3Analytics/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/jwposton/FF3Analytics/releases/tag/v1.0.0
