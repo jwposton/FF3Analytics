@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from copy import deepcopy
 from typing import Any, Callable
 
 import httpx
@@ -169,6 +170,67 @@ class FireflyClient:
         async with self._build_client() as client:
             response = await client.get(f"/api/v1/accounts/{account_id}")
             if response.status_code != 200:
+                raise RuntimeError(
+                    f"Firefly API error {response.status_code}: {response.text}"
+                )
+            payload = response.json()
+            data = payload.get("data", {})
+            return {
+                "id": str(data.get("id")),
+                "attributes": data.get("attributes", {}),
+            }
+
+    async def fetch_transaction(self, group_id: str) -> dict[str, Any]:
+        async with self._build_client() as client:
+            response = await client.get(f"/api/v1/transactions/{group_id}")
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Firefly API error {response.status_code}: {response.text}"
+                )
+            payload = response.json()
+            data = payload.get("data", {})
+            return {
+                "id": str(data.get("id")),
+                "attributes": data.get("attributes", {}),
+            }
+
+    async def update_transaction(
+        self,
+        group_id: str,
+        mutate_fn: Callable[[dict[str, Any]], dict[str, Any]],
+    ) -> dict[str, Any]:
+        journal = await self.fetch_transaction(group_id)
+        attrs = journal.get("attributes", {})
+        updated_attrs = mutate_fn(deepcopy(attrs))
+        put_body = {
+            "apply_rules": False,
+            "transactions": updated_attrs.get("transactions", []),
+        }
+        async with self._build_client() as client:
+            response = await client.put(
+                f"/api/v1/transactions/{group_id}",
+                json=put_body,
+            )
+            if response.status_code not in (200, 201):
+                raise RuntimeError(
+                    f"Firefly API error {response.status_code}: {response.text}"
+                )
+            payload = response.json()
+            data = payload.get("data", {})
+            return {
+                "id": str(data.get("id")),
+                "attributes": data.get("attributes", {}),
+            }
+
+    async def update_account(
+        self, account_id: str, attributes: dict[str, Any]
+    ) -> dict[str, Any]:
+        async with self._build_client() as client:
+            response = await client.put(
+                f"/api/v1/accounts/{account_id}",
+                json=attributes,
+            )
+            if response.status_code not in (200, 201):
                 raise RuntimeError(
                     f"Firefly API error {response.status_code}: {response.text}"
                 )
