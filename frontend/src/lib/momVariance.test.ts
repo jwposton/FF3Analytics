@@ -252,7 +252,7 @@ describe("buildTrendVsAverageSeries", () => {
       },
     )
 
-    const { deltaMonths, series } = buildTrendVsAverageSeries(chart, 2, "mean")
+    const { deltaMonths, series } = buildTrendVsAverageSeries(chart, 3, "mean")
 
     expect(deltaMonths).toEqual(["2024-02", "2024-03"])
     expect(series).toEqual([
@@ -282,7 +282,7 @@ describe("buildTrendChartSeries", () => {
 
   it("uses rolling-average deltas in vs-average mode", () => {
     const { series } = buildTrendChartSeries(chart, "vs-average", {
-      rollingWindow: 2,
+      rollingWindow: 3,
       rollingAverageMethod: "mean",
     })
     expect(series[0]?.data).toEqual([20, -20])

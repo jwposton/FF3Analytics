@@ -94,12 +94,12 @@ describe("buildCompareAmountTableData", () => {
         monthA: "2024-02",
         monthB: "2024-03",
         currentMonth: "2024-03",
-        rollingWindow: 2,
+        rollingWindow: 3,
         rollingAverageMethod: "mean",
       },
     )
 
-    expect(table?.columns.at(-1)?.label).toBe("2mo avg")
+    expect(table?.columns.at(-1)?.label).toBe("3mo avg")
     expect(table?.rows[0]?.values.__baseline__).toBe(110)
     expect(table?.rows[0]?.values["2024-03"]).toBe(150)
   })
