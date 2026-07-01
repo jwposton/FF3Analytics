@@ -32,14 +32,20 @@ describe("SpendingMomPage", () => {
       filter: (row: unknown) => boolean
       pageTitle: string
       emptyMessage: string
+      compareEmptyMessage: string
       momTopNFamily: string
       trendChartTitle: string
+      compareChartTitle: string
     }
 
     expect(props.pageTitle).toBe("Spending")
     expect(props.emptyMessage).toBe("No spending in this date range")
+    expect(props.compareEmptyMessage).toBe(
+      "Select a range spanning at least two months to compare months",
+    )
     expect(props.momTopNFamily).toBe("spending")
     expect(props.trendChartTitle).toBe("MoM spending change")
+    expect(props.compareChartTitle).toBe("Month-over-month spending change")
     expect(props.filter).toBe(isSpendingExpense)
   })
 })

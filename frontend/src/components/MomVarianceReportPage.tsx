@@ -1,12 +1,17 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
+import { MomCompareChart } from "@/components/MomCompareChart"
 import { MomTrendChart } from "@/components/MomTrendChart"
 import { Button } from "@/components/ui/button"
 import { useDateRange } from "@/context/DateRangeContext"
 import { useNormalizedTransactions } from "@/hooks/useNormalizedTransactions"
 import { buildBarChartData } from "@/lib/barChart"
 import {
+  aggregateOtherDeltas,
   buildTrendDeltaSeries,
+  compareDelta,
+  defaultMonthPair,
+  rankStacksByAbsDelta,
   rankTrendStacksByActivity,
   sliceTrendWindowMonths,
 } from "@/lib/momVariance"
@@ -20,14 +25,20 @@ export type MomVarianceReportPageProps = {
   filter: (row: OmniRow) => boolean
   pageTitle: string
   emptyMessage: string
+  compareEmptyMessage: string
   useCashFlowLabels?: boolean
   momTopNFamily: MomTopNFamily
   trendChartTitle: string
+  compareChartTitle: string
   yAxisNameTrend: string
+  yAxisNameCompare: string
   interactionHintTrend: string
+  interactionHintCompare: string
   tabTrendLabel: string
   tabCompareLabel: string
   topNLabel: string
+  monthALabel?: string
+  monthBLabel?: string
 }
 
 type ActiveTab = "trend" | "compare"
@@ -58,14 +69,20 @@ export function MomVarianceReportPage({
   filter,
   pageTitle,
   emptyMessage,
+  compareEmptyMessage,
   useCashFlowLabels = false,
   momTopNFamily,
   trendChartTitle,
+  compareChartTitle,
   yAxisNameTrend,
+  yAxisNameCompare,
   interactionHintTrend,
+  interactionHintCompare,
   tabTrendLabel,
   tabCompareLabel,
   topNLabel,
+  monthALabel = "Month A",
+  monthBLabel = "Month B",
 }: MomVarianceReportPageProps) {
   const { committedRange } = useDateRange()
   const { start: committedStart, end: committedEnd } = committedRange
@@ -74,6 +91,8 @@ export function MomVarianceReportPage({
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("trend")
   const [topN, setTopN] = useState(() => readMomTopN(momTopNFamily))
+  const [monthA, setMonthA] = useState("")
+  const [monthB, setMonthB] = useState("")
 
   const allRows = isSuccess ? (data?.data ?? []) : []
   const sliceRows = useMemo(() => allRows.filter(filter), [allRows, filter])
@@ -87,6 +106,15 @@ export function MomVarianceReportPage({
       }),
     [sliceRows, committedStart, committedEnd, useCashFlowLabels],
   )
+
+  const months = budgetChartData.months
+  const monthsSelectable = months.length >= 2
+
+  useEffect(() => {
+    const pair = defaultMonthPair(months)
+    setMonthA(pair.monthA)
+    setMonthB(pair.monthB)
+  }, [committedStart, committedEnd, months])
 
   const trendChartData = useMemo(() => {
     const windowMonths = sliceTrendWindowMonths(budgetChartData.months)
@@ -102,6 +130,23 @@ export function MomVarianceReportPage({
     const series = filterTrendSeriesByTopN(allSeries, topNames)
     return { deltaMonths, series }
   }, [budgetChartData, topN])
+
+  const compareChartData = useMemo(() => {
+    if (!monthsSelectable || !monthA || !monthB) {
+      return { sortedNames: [] as string[], deltas: new Map<string, number>() }
+    }
+
+    const rawDeltas = compareDelta(budgetChartData, monthA, monthB)
+    const { names: topNames } = rankStacksByAbsDelta(rawDeltas, topN)
+    const aggregated = aggregateOtherDeltas(rawDeltas, topNames)
+    const sortedNames = topNames.filter((name) => aggregated.has(name))
+
+    return { sortedNames, deltas: aggregated }
+  }, [budgetChartData, monthA, monthB, topN, monthsSelectable])
+
+  const compareDisplayMessage = monthsSelectable
+    ? emptyMessage
+    : compareEmptyMessage
 
   const controlsDisabled = isPending || isError
 
@@ -165,6 +210,41 @@ export function MomVarianceReportPage({
               </Button>
             </div>
 
+            {activeTab === "compare" ? (
+              <>
+                <label className="flex items-center gap-2 font-medium">
+                  {monthALabel}
+                  <select
+                    className="min-w-[140px] rounded-md border border-input bg-background px-2 py-1"
+                    value={monthA}
+                    disabled={controlsDisabled || !monthsSelectable}
+                    onChange={(e) => setMonthA(e.target.value)}
+                  >
+                    {months.map((month) => (
+                      <option key={month} value={month}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 font-medium">
+                  {monthBLabel}
+                  <select
+                    className="min-w-[140px] rounded-md border border-input bg-background px-2 py-1"
+                    value={monthB}
+                    disabled={controlsDisabled || !monthsSelectable}
+                    onChange={(e) => setMonthB(e.target.value)}
+                  >
+                    {months.map((month) => (
+                      <option key={month} value={month}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : null}
+
             <label className="flex items-center gap-2 font-medium">
               {topNLabel}
               <input
@@ -198,9 +278,15 @@ export function MomVarianceReportPage({
               yAxisName={yAxisNameTrend}
             />
           ) : (
-            <div className="flex min-h-[480px] items-center justify-center rounded-lg border bg-card text-sm text-muted-foreground">
-              Compare view coming next
-            </div>
+            <MomCompareChart
+              sortedNames={compareChartData.sortedNames}
+              deltas={compareChartData.deltas}
+              loading={isPending}
+              emptyMessage={compareDisplayMessage}
+              chartTitle={compareChartTitle}
+              interactionHint={interactionHintCompare}
+              yAxisName={yAxisNameCompare}
+            />
           )}
         </div>
       )}
