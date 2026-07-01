@@ -207,6 +207,9 @@ describe("LoanSplitsQueuePage", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: /Open in Firefly/i })).toBeTruthy()
     })
+    expect(screen.getByRole("link", { name: /Open in Firefly/i }).getAttribute("href")).toBe(
+      "https://ff.example/transactions/show/100",
+    )
   })
 
   it("hides link when firefly_base_url absent", async () => {

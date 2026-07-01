@@ -427,7 +427,7 @@ describe("CategorizePage Firefly links", () => {
       expect(screen.getByRole("link", { name: /Open in Firefly/i })).toBeTruthy()
     })
     expect(screen.getByRole("link", { name: /Open in Firefly/i }).getAttribute("href")).toBe(
-      "https://ff.example/transactions/show/1001",
+      "https://ff.example/transactions/show/100",
     )
   })
 

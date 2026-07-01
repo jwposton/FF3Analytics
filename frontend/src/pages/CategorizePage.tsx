@@ -127,7 +127,7 @@ function TransactionCard({
           <div className="flex items-center gap-3">
             <FireflyTransactionLink
               fireflyBaseUrl={fireflyBaseUrl}
-              journalId={row.transaction_journal_id}
+                        journalId={row.journal_id}
             />
             <span className="font-medium">{row.amount}</span>
           </div>
