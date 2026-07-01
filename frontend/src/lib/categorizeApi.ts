@@ -25,10 +25,13 @@ export type CategorizeMetaResponse = {
   default_model: string
 }
 
+export type DestinationMatchType = "contains" | "starts_with" | "ends_with" | "is"
+
 export type RuleDraft = {
   title: string
   description_contains: string
   destination_account?: string | null
+  destination_match_type?: DestinationMatchType
   transaction_type?: "withdrawal" | "deposit" | null
 }
 

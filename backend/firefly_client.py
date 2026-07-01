@@ -215,6 +215,35 @@ class FireflyClient:
             },
         )
 
+    async def create_rule_group(self, title: str) -> dict[str, Any]:
+        async with self._build_client() as client:
+            response = await client.post(
+                "/api/v1/rule-groups",
+                json={"title": title.strip(), "active": True},
+            )
+            if response.status_code not in (200, 201):
+                raise RuntimeError(
+                    f"Firefly API error {response.status_code}: {_format_firefly_error(response)}"
+                )
+            payload = response.json()
+            data = payload.get("data", {})
+            attrs = data.get("attributes", {})
+            return {
+                "id": str(data.get("id")),
+                "title": attrs.get("title"),
+            }
+
+    async def ensure_rule_group(self, title: str) -> str:
+        """Return rule group id, creating the group in Firefly when missing."""
+        name = title.strip()
+        if not name:
+            raise ValueError("rule group title required")
+        for group in await self.fetch_rule_groups():
+            if (group.get("title") or "").strip() == name:
+                return str(group["id"])
+        created = await self.create_rule_group(name)
+        return str(created["id"])
+
     async def create_rule(self, rule_body: dict[str, Any]) -> dict[str, Any]:
         async with self._build_client() as client:
             response = await client.post("/api/v1/rules", json=rule_body)
