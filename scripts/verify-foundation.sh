@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Nyquist foundation verification: compose up, health curls, compose down.
-# Expected RED until docker-compose.yml exists (plan 01-01).
+# Prod-default: nginx static frontend on :5174 (proxies /api and /health).
+# Dev overlay: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,7 +19,7 @@ trap cleanup EXIT
 
 BACKEND_HEALTH="http://localhost:18001/health"
 FRONTEND_HEALTH="http://localhost:5174/health"
-MAX_WAIT=90
+MAX_WAIT=120
 
 assert_status_ok() {
   local url="$1"
@@ -68,5 +69,23 @@ wait_for_health "$BACKEND_HEALTH" "backend"
 
 echo "Waiting for proxied frontend health ($FRONTEND_HEALTH)..."
 wait_for_health "$FRONTEND_HEALTH" "frontend"
+
+FRONTEND_API="http://localhost:5174/api/normalized_transactions"
+echo "Checking proxied API ($FRONTEND_API)..."
+api_code="$(curl -sf -o /dev/null -w '%{http_code}' "$FRONTEND_API" || echo "000")"
+if [[ "$api_code" != "422" ]]; then
+  echo "ERROR: proxied API expected HTTP 422 (missing query params), got $api_code" >&2
+  exit 1
+fi
+echo "OK: proxied API returned 422"
+
+FRONTEND_DEEPLINK="http://localhost:5174/reports/spending/sankey"
+echo "Checking SPA deep link ($FRONTEND_DEEPLINK)..."
+deeplink_body="$(curl -sf "$FRONTEND_DEEPLINK")"
+if ! echo "$deeplink_body" | grep -q 'id="root"'; then
+  echo "ERROR: SPA deep link response missing id=\"root\" mount point" >&2
+  exit 1
+fi
+echo "OK: SPA deep link served index.html"
 
 echo "Foundation verification passed."
