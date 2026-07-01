@@ -87,9 +87,9 @@ export function MomTrendChart({
         idx === 0
           ? {
               silent: true,
-              symbol: "none",
+              symbol: "none" as const,
               lineStyle: {
-                type: "dashed",
+                type: "dashed" as const,
                 color: "hsla(240, 4%, 46%, 0.4)",
               },
               data: [{ yAxis: 0 }],
