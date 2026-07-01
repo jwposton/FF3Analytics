@@ -11,6 +11,7 @@ import { CashFlowSankeyPage } from "@/pages/CashFlowSankeyPage"
 import { CashFlowMomPage } from "@/pages/CashFlowMomPage"
 import { SpendingMomPage } from "@/pages/SpendingMomPage"
 import { TransactionExplorerPage } from "@/pages/TransactionExplorerPage"
+import { CategorizePage } from "@/pages/CategorizePage"
 import { AboutPage } from "@/pages/AboutPage"
 
 export const router = createBrowserRouter([
@@ -22,6 +23,10 @@ export const router = createBrowserRouter([
       {
         path: "reports/transactions",
         element: <TransactionExplorerPage />,
+      },
+      {
+        path: "manage/categorize",
+        element: <CategorizePage />,
       },
       {
         path: "reports/spending",
