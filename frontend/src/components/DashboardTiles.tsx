@@ -25,7 +25,8 @@ import {
 } from "@/lib/spending"
 import type { OmniRow } from "@/types/NormalizedTransaction"
 
-const BUDGET_TOP_N = 20
+const BUDGET_PIE_TOP_N = 15
+const BUDGET_BAR_TOP_N = 15
 const ROLLING_WINDOW_MONTHS = 12 as RollingWindowMonths
 
 type DashboardTilesProps = {
@@ -92,7 +93,7 @@ export function DashboardTiles({
       end: rangeEnd,
     })
     const totals = stackTotalsAcrossMonths(chartData)
-    const { names } = rankStacksByAmount(totals, BUDGET_TOP_N)
+    const { names } = rankStacksByAmount(totals, BUDGET_PIE_TOP_N)
     const aggregated = aggregateOtherAmounts(totals, names)
     return names
       .filter((name) => aggregated.has(name))
@@ -120,7 +121,7 @@ export function DashboardTiles({
     for (const [name, { current }] of pairs) {
       currentTotals.set(name, current)
     }
-    const { names } = rankStacksByAmount(currentTotals, BUDGET_TOP_N)
+    const { names } = rankStacksByAmount(currentTotals, BUDGET_BAR_TOP_N)
     const aggregated = aggregateOtherBaselines(pairs, names)
     const sortedNames = names.filter((name) => aggregated.has(name))
     return { sortedNames, values: aggregated }

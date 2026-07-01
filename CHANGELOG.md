@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Favicon** — Custom FF3Analytics icon (three-bar chart motif using app chart colors)
+
+### Changed
+
+- **Dashboard budget pie chart** — Full pie with exterior labels (hidden below 5% share), taller layout, and canvas renderer
+- **Dashboard budget bar chart** — Legend and grid spacing tweaks
+- **Dashboard budget charts** — Show top 15 budgets instead of 20
+
 ## [1.1.6] - 2026-07-01
 
 ### Added

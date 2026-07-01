@@ -10,6 +10,7 @@ import { formatCurrency } from "@/lib/spending"
 
 const CURRENT_COLOR = "#60A5FA"
 const AVERAGE_COLOR = "#94A3B8"
+const CHART_OPTS = { renderer: "canvas" as const }
 
 type BudgetCurrentVsAverageChartProps = {
   sortedNames: string[]
@@ -63,9 +64,12 @@ export function BudgetCurrentVsAverageChart({
       },
       legend: {
         top: 0,
+        itemWidth: 14,
+        itemHeight: 10,
+        textStyle: { fontSize: 12, color: "hsl(240 5% 34%)" },
         data: [currentSeriesLabel, averageSeriesLabel],
       },
-      grid: { left: 110, right: 40, top: 36, bottom: 30 },
+      grid: { left: 110, right: 24, top: 40, bottom: 30 },
       xAxis: {
         type: "value",
         name: yAxisName,
@@ -86,28 +90,16 @@ export function BudgetCurrentVsAverageChart({
         {
           name: currentSeriesLabel,
           type: "bar",
+          barGap: "20%",
+          barCategoryGap: "36%",
           data: sortedNames.map((name) => values.get(name)?.current ?? 0),
           itemStyle: { color: CURRENT_COLOR },
-          label: {
-            show: true,
-            position: "right",
-            fontSize: 10,
-            formatter: (params: { value?: unknown }) =>
-              formatCurrency(tooltipValue(params.value)),
-          },
         },
         {
           name: averageSeriesLabel,
           type: "bar",
           data: sortedNames.map((name) => values.get(name)?.baseline ?? 0),
           itemStyle: { color: AVERAGE_COLOR },
-          label: {
-            show: true,
-            position: "right",
-            fontSize: 10,
-            formatter: (params: { value?: unknown }) =>
-              formatCurrency(tooltipValue(params.value)),
-          },
         },
       ],
     }
@@ -148,6 +140,7 @@ export function BudgetCurrentVsAverageChart({
         ) : (
           <ReactECharts
             option={option}
+            opts={CHART_OPTS}
             style={{ height: chartHeight, width: "100%" }}
             notMerge
             lazyUpdate

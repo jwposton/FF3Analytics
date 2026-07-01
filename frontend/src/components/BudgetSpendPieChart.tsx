@@ -12,12 +12,18 @@ export type BudgetSpendSlice = {
   value: number
 }
 
+/** Segments below this share hide exterior labels (tooltip still shows detail). */
+export const PIE_LABEL_MIN_PERCENT = 5
+
 type BudgetSpendPieChartProps = {
   slices: BudgetSpendSlice[]
   loading: boolean
   emptyMessage: string
   chartTitle?: string
 }
+
+const CHART_HEIGHT = 480
+const CHART_OPTS = { renderer: "canvas" as const }
 
 function tooltipFormatter(params: unknown): string {
   const item = Array.isArray(params) ? params[0] : params
@@ -27,12 +33,21 @@ function tooltipFormatter(params: unknown): string {
     value?: unknown
     percent?: number
   }
-  const value = typeof record.value === "number" ? record.value : Number(record.value)
+  const value =
+    typeof record.value === "number" ? record.value : Number(record.value)
   const pct =
-    typeof record.percent === "number"
-      ? record.percent.toFixed(1)
-      : "0.0"
+    typeof record.percent === "number" ? record.percent.toFixed(1) : "0.0"
   return `${record.name ?? ""}\n${formatCurrency(value)} (${pct}%)`
+}
+
+export function pieSegmentLabel(
+  name: string,
+  percent: number,
+  minPercent = PIE_LABEL_MIN_PERCENT,
+): string {
+  if (percent < minPercent) return ""
+  const shortName = name.length > 18 ? `${name.slice(0, 16)}…` : name
+  return `${shortName}\n${percent.toFixed(1)}%`
 }
 
 export function BudgetSpendPieChart({
@@ -49,31 +64,43 @@ export function BudgetSpendPieChart({
         trigger: "item",
         formatter: tooltipFormatter,
       },
-      legend: {
-        type: "scroll",
-        orient: "vertical",
-        right: 8,
-        top: "middle",
-        textStyle: { fontSize: 11 },
-      },
       series: [
         {
           type: "pie",
-          radius: ["42%", "68%"],
-          center: ["38%", "50%"],
+          radius: "74%",
+          center: ["50%", "52%"],
+          minAngle: 2,
           avoidLabelOverlap: true,
           itemStyle: {
-            borderRadius: 4,
             borderColor: "hsl(var(--background))",
-            borderWidth: 2,
+            borderWidth: 1,
           },
-          label: { show: false },
+          label: {
+            show: true,
+            fontSize: 11,
+            color: "hsl(240 5% 34%)",
+            lineHeight: 14,
+            formatter: (params: { name?: string; percent?: number }) =>
+              pieSegmentLabel(
+                params.name ?? "",
+                params.percent ?? 0,
+              ),
+          },
+          labelLine: {
+            length: 12,
+            length2: 10,
+            smooth: true,
+            lineStyle: { color: "hsl(240 5% 65%)" },
+          },
+          labelLayout: {
+            hideOverlap: true,
+          },
           emphasis: {
-            label: {
-              show: true,
-              fontSize: 12,
-              formatter: (params: { name?: string; percent?: number }) =>
-                `${params.name ?? ""}\n${(params.percent ?? 0).toFixed(1)}%`,
+            scale: true,
+            scaleSize: 6,
+            itemStyle: {
+              shadowBlur: 8,
+              shadowColor: "rgba(0, 0, 0, 0.12)",
             },
           },
           data: slices.map((slice, idx) => ({
@@ -93,7 +120,7 @@ export function BudgetSpendPieChart({
           <Skeleton className="h-5 w-40" />
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-[320px] w-full" />
+          <Skeleton className="h-[480px] w-full" />
         </CardContent>
       </Card>
     )
@@ -106,13 +133,14 @@ export function BudgetSpendPieChart({
       </CardHeader>
       <CardContent>
         {isEmpty ? (
-          <div className="flex h-[320px] items-center justify-center text-center text-sm text-muted-foreground">
+          <div className="flex h-[480px] items-center justify-center text-center text-sm text-muted-foreground">
             {emptyMessage}
           </div>
         ) : (
           <ReactECharts
             option={option}
-            style={{ height: 320, width: "100%" }}
+            opts={CHART_OPTS}
+            style={{ height: CHART_HEIGHT, width: "100%" }}
             notMerge
             lazyUpdate
             data-testid="budget-spend-pie-chart"
