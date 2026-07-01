@@ -1,3 +1,20 @@
+import { MomVarianceReportPage } from "@/components/MomVarianceReportPage"
+import { isCashFlowOutflow } from "@/lib/spending"
+
 export function CashFlowMomPage() {
-  return <h1>Cash Flow</h1>
+  return (
+    <MomVarianceReportPage
+      filter={isCashFlowOutflow}
+      useCashFlowLabels
+      pageTitle="Cash Flow"
+      emptyMessage="No cash outflow in this date range"
+      momTopNFamily="cash-flow"
+      trendChartTitle="MoM cash outflow change"
+      yAxisNameTrend="Δ cash outflow"
+      interactionHintTrend="Click a budget line to drill down by category."
+      tabTrendLabel="Trend"
+      tabCompareLabel="Compare"
+      topNLabel="Budgets shown:"
+    />
+  )
 }
