@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-07-01
+
+### Added
+
+- **Dashboard budget charts** — Pie chart of spending by budget (top 20) for the selected date range; horizontal bar chart comparing current-month spend to the 12-month rolling average per budget (reuses MoM variance rolling-average logic)
+
 ### Changed
 
 - **CI** — Bump GitHub Actions to Node.js 24 runtimes (`checkout@v5`, `setup-python@v6`, `setup-node@v6`, Docker actions v4/v7)
@@ -141,7 +147,8 @@ First stable release: self-hosted Firefly III analytics with production Docker d
 
 - Firefly API token stays server-side only; CORS restricted to configured origins
 
-[Unreleased]: https://github.com/jwposton/FF3Analytics/compare/v1.1.5...HEAD
+[Unreleased]: https://github.com/jwposton/FF3Analytics/compare/v1.1.6...HEAD
+[1.1.6]: https://github.com/jwposton/FF3Analytics/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/jwposton/FF3Analytics/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/jwposton/FF3Analytics/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/jwposton/FF3Analytics/compare/v1.1.2...v1.1.3

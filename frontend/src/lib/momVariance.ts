@@ -84,29 +84,69 @@ export function rollingBaselineAmount(
   return values.reduce((total, value) => total + value, 0) / values.length
 }
 
+export function baselineMonthsInChart(
+  chartData: BarChartData,
+  currentMonth: string,
+  windowMonths: RollingWindowMonths,
+): string[] {
+  return rollingMonthsBefore(currentMonth, windowMonths).filter((month) =>
+    chartData.months.includes(month),
+  )
+}
+
+export type CurrentVsBaseline = {
+  current: number
+  baseline: number
+}
+
+export function currentVsRollingBaseline(
+  chartData: BarChartData,
+  currentMonth: string,
+  windowMonths: RollingWindowMonths,
+  method: RollingAverageMethod = "mean",
+): Map<string, CurrentVsBaseline> | null {
+  const baselineMonths = baselineMonthsInChart(
+    chartData,
+    currentMonth,
+    windowMonths,
+  )
+  if (baselineMonths.length === 0) {
+    return null
+  }
+
+  const result = new Map<string, CurrentVsBaseline>()
+  for (const stack of chartData.stacks) {
+    result.set(stack, {
+      current: chartData.data[currentMonth]?.[stack] ?? 0,
+      baseline: rollingBaselineAmount(
+        chartData,
+        stack,
+        baselineMonths,
+        method,
+      ),
+    })
+  }
+  return result
+}
+
 export function compareToRollingAverage(
   chartData: BarChartData,
   currentMonth: string,
   windowMonths: RollingWindowMonths,
   method: RollingAverageMethod = "mean",
 ): Map<string, number> {
-  const baselineMonths = rollingMonthsBefore(currentMonth, windowMonths).filter(
-    (month) => chartData.months.includes(month),
+  const pairs = currentVsRollingBaseline(
+    chartData,
+    currentMonth,
+    windowMonths,
+    method,
   )
   const deltas = new Map<string, number>()
-
-  if (baselineMonths.length === 0) {
+  if (pairs == null) {
     return deltas
   }
 
-  for (const stack of chartData.stacks) {
-    const current = chartData.data[currentMonth]?.[stack] ?? 0
-    const baseline = rollingBaselineAmount(
-      chartData,
-      stack,
-      baselineMonths,
-      method,
-    )
+  for (const [stack, { current, baseline }] of pairs) {
     deltas.set(stack, current - baseline)
   }
 
@@ -168,6 +208,74 @@ export function rankStacksByAbsDelta(
     names: includesOther ? [...top, OTHER_LABEL] : top,
     includesOther,
   }
+}
+
+export function rankStacksByAmount(
+  totals: Map<string, number>,
+  topN: number,
+): { names: string[]; includesOther: boolean } {
+  const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1])
+  const top = sorted.slice(0, topN).map(([name]) => name)
+  const includesOther = sorted.length > topN
+  return {
+    names: includesOther ? [...top, OTHER_LABEL] : top,
+    includesOther,
+  }
+}
+
+export function aggregateOtherAmounts(
+  totals: Map<string, number>,
+  topNames: string[],
+): Map<string, number> {
+  const topSet = new Set(topNames.filter((name) => name !== OTHER_LABEL))
+  const result = new Map<string, number>()
+  let otherSum = 0
+  let hasExcluded = false
+
+  for (const [name, amount] of totals) {
+    if (topSet.has(name)) {
+      result.set(name, amount)
+    } else {
+      otherSum += amount
+      hasExcluded = true
+    }
+  }
+
+  if (hasExcluded) {
+    result.set(OTHER_LABEL, otherSum)
+  }
+
+  return result
+}
+
+export function aggregateOtherBaselines(
+  pairs: Map<string, CurrentVsBaseline>,
+  topNames: string[],
+): Map<string, CurrentVsBaseline> {
+  const topSet = new Set(topNames.filter((name) => name !== OTHER_LABEL))
+  const result = new Map<string, CurrentVsBaseline>()
+  let otherCurrent = 0
+  let otherBaseline = 0
+  let hasExcluded = false
+
+  for (const [name, values] of pairs) {
+    if (topSet.has(name)) {
+      result.set(name, values)
+    } else {
+      otherCurrent += values.current
+      otherBaseline += values.baseline
+      hasExcluded = true
+    }
+  }
+
+  if (hasExcluded) {
+    result.set(OTHER_LABEL, {
+      current: otherCurrent,
+      baseline: otherBaseline,
+    })
+  }
+
+  return result
 }
 
 export function aggregateOtherDeltas(

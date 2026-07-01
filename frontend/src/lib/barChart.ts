@@ -150,6 +150,22 @@ export function buildBarChartData(
   return { months, stacks, data }
 }
 
+export function stackTotalsAcrossMonths(
+  chartData: BarChartData,
+): Map<string, number> {
+  const totals = new Map<string, number>()
+  for (const stack of chartData.stacks) {
+    totals.set(
+      stack,
+      chartData.months.reduce(
+        (sum, month) => sum + (chartData.data[month]?.[stack] ?? 0),
+        0,
+      ),
+    )
+  }
+  return totals
+}
+
 export function barChartDataToLineSeries(
   chartData: BarChartData,
   options?: LineSeriesOptions,

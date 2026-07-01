@@ -2,14 +2,18 @@ import { describe, expect, it } from "vitest"
 
 import type { BarChartData } from "@/lib/barChart"
 import {
+  aggregateOtherAmounts,
+  aggregateOtherBaselines,
   aggregateOtherDeltas,
   addMonths,
   buildTrendDeltaSeries,
   compareDelta,
   compareToRollingAverage,
+  currentVsRollingBaseline,
   defaultMonthPair,
   medianOf,
   rankStacksByAbsDelta,
+  rankStacksByAmount,
   rankTrendStacksByActivity,
   rollingAverageFetchRange,
   rollingMonthsBefore,
@@ -312,6 +316,70 @@ describe("compareToRollingAverage", () => {
       "2024-04": { Groceries: 100 },
     })
     expect(compareToRollingAverage(chart, "2024-04", 3).size).toBe(0)
+  })
+})
+
+describe("currentVsRollingBaseline", () => {
+  it("returns current and baseline amounts per stack", () => {
+    const chart = makeChartData(
+      ["2024-01", "2024-02", "2024-03", "2024-04"],
+      ["Groceries"],
+      {
+        "2024-01": { Groceries: 100 },
+        "2024-02": { Groceries: 200 },
+        "2024-03": { Groceries: 300 },
+        "2024-04": { Groceries: 400 },
+      },
+    )
+    const pairs = currentVsRollingBaseline(chart, "2024-04", 3, "mean")
+    expect(pairs?.get("Groceries")).toEqual({ current: 400, baseline: 200 })
+  })
+
+  it("returns null when no baseline months exist in chart data", () => {
+    const chart = makeChartData(["2024-04"], ["Groceries"], {
+      "2024-04": { Groceries: 100 },
+    })
+    expect(currentVsRollingBaseline(chart, "2024-04", 3)).toBeNull()
+  })
+})
+
+describe("rankStacksByAmount", () => {
+  it("sorts by amount descending", () => {
+    const totals = new Map([
+      ["Small", 5],
+      ["Large", 40],
+      ["Medium", 20],
+    ])
+    const { names } = rankStacksByAmount(totals, 3)
+    expect(names).toEqual(["Large", "Medium", "Small"])
+  })
+})
+
+describe("aggregateOtherAmounts", () => {
+  it("sums excluded stacks into Other", () => {
+    const totals = new Map([
+      ["A", 100],
+      ["B", 20],
+      ["C", 30],
+    ])
+    const aggregated = aggregateOtherAmounts(totals, ["A", "B", "Other"])
+    expect(aggregated.get("A")).toBe(100)
+    expect(aggregated.get("B")).toBe(20)
+    expect(aggregated.get("Other")).toBe(30)
+  })
+})
+
+describe("aggregateOtherBaselines", () => {
+  it("sums excluded current and baseline into Other", () => {
+    const pairs = new Map([
+      ["A", { current: 100, baseline: 80 }],
+      ["B", { current: 20, baseline: 10 }],
+      ["C", { current: 30, baseline: 15 }],
+    ])
+    const aggregated = aggregateOtherBaselines(pairs, ["A", "B", "Other"])
+    expect(aggregated.get("A")).toEqual({ current: 100, baseline: 80 })
+    expect(aggregated.get("B")).toEqual({ current: 20, baseline: 10 })
+    expect(aggregated.get("Other")).toEqual({ current: 30, baseline: 15 })
   })
 })
 
