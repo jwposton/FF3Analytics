@@ -12,6 +12,9 @@ import { CashFlowMomPage } from "@/pages/CashFlowMomPage"
 import { SpendingMomPage } from "@/pages/SpendingMomPage"
 import { TransactionExplorerPage } from "@/pages/TransactionExplorerPage"
 import { CategorizePage } from "@/pages/CategorizePage"
+import { LoansPage } from "@/pages/LoansPage"
+import { LoanProfilePage } from "@/pages/LoanProfilePage"
+import { LoanSplitsQueuePage } from "@/pages/LoanSplitsQueuePage"
 import { AboutPage } from "@/pages/AboutPage"
 
 export const router = createBrowserRouter([
@@ -27,6 +30,18 @@ export const router = createBrowserRouter([
       {
         path: "manage/categorize",
         element: <CategorizePage />,
+      },
+      {
+        path: "manage/loans",
+        element: <LoansPage />,
+      },
+      {
+        path: "manage/loans/queue",
+        element: <LoanSplitsQueuePage />,
+      },
+      {
+        path: "manage/loans/:accountId",
+        element: <LoanProfilePage />,
       },
       {
         path: "reports/spending",
