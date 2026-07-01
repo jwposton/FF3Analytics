@@ -186,6 +186,7 @@ async def test_preview_rule_matches_counts():
             "type": "withdrawal",
             "description": "amzn mktp order",
             "category_name": "Shopping",
+            "budget_name": "Shopping",
         },
         {
             "type": "withdrawal",
